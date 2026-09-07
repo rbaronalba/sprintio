@@ -1,0 +1,8 @@
+{
+  "name": "sprintio",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "web": "pnpm --filter web start"
+  }
+}
