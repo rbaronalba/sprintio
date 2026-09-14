@@ -1,0 +1,43 @@
+<header class="top-nav">
+  <span class="mark">
+    <span class="cavallino" aria-hidden="true"></span>
+    Sprintio
+  </span>
+  <nav class="nav-links" aria-label="Main">
+    <a href="#" class="nav-link">Boards</a>
+    <a href="#" class="nav-link">Sprints</a>
+    <a href="#" class="nav-link">Team</a>
+  </nav>
+  <div class="nav-utils">
+    <app-theme-toggle />
+    <button type="button" class="btn btn-outline" (click)="logout()">Log out</button>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <p class="label-caps kicker">Current sprint</p>
+    <h1>Paddock.</h1>
+    @if (auth.currentUser(); as user) {
+      <p class="signed-in">
+        Signed in as <strong data-testid="current-user">{{ user.email }}</strong>
+        <span class="role">{{ user.role }}</span>
+      </p>
+    }
+  </section>
+
+  <section class="specs" aria-label="Sprint figures">
+    <div class="spec">
+      <p class="spec-value spec-value--accent">0</p>
+      <p class="label-caps spec-label">Boards</p>
+    </div>
+    <div class="spec">
+      <p class="spec-value">0</p>
+      <p class="label-caps spec-label">Cards in flight</p>
+    </div>
+    <div class="spec">
+      <p class="spec-value">0</p>
+      <p class="label-caps spec-label">Shipped</p>
+    </div>
+  </section>
+</main>

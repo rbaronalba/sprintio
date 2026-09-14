@@ -1,0 +1,162 @@
+:host {
+  display: block;
+  min-height: 100vh;
+}
+
+.auth-split {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  min-height: 100vh;
+}
+
+.corner-toggle {
+  position: absolute;
+  top: var(--space-xs);
+  right: var(--space-xs);
+  z-index: 1;
+}
+
+/* The cinema panel stands in for the brand's full-bleed hero photograph.
+   Art-directed photography drops in here as a background-image. */
+.cinema {
+  position: relative;
+  background: var(--cinema-gradient);
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: var(--space-lg);
+  overflow: hidden;
+}
+
+/* Livery stripe — the one place Rosso Corsa appears outside the CTA. */
+.cinema::after {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 6px;
+  background: linear-gradient(180deg, #a00c01, #da291c 64%);
+}
+
+.cinema-mark {
+  position: relative;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.65px;
+  text-transform: uppercase;
+}
+
+.cinema-headline {
+  position: relative;
+  max-width: 16ch;
+  margin: 0;
+  font-size: clamp(40px, 5.5vw, 80px);
+  font-weight: 500;
+  line-height: 1.05;
+  letter-spacing: -1.6px;
+}
+
+.cinema-kicker {
+  position: relative;
+  margin: 0 0 var(--space-sm);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* Form side */
+.panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-md);
+  padding: var(--space-xxl) var(--space-lg);
+  background: var(--canvas);
+}
+
+.panel-title {
+  font-size: 26px;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: 0.195px;
+  margin: 0;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+  max-width: 420px;
+}
+
+label {
+  color: var(--body);
+  margin-top: var(--space-xs);
+}
+
+input {
+  height: 48px;
+  padding: 14px var(--space-xs);
+  background: var(--input-bg);
+  color: var(--ink);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  transition: border-color 120ms linear;
+}
+
+input:focus {
+  border-color: var(--ink);
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  margin: var(--space-xs) 0 0;
+  color: #f13a2c;
+  font-size: 13px;
+}
+
+.error::before {
+  content: '';
+  width: 2px;
+  align-self: stretch;
+  background: currentColor;
+}
+
+button[type='submit'] {
+  margin-top: var(--space-md);
+  width: 100%;
+}
+
+.switch {
+  margin: 0;
+  color: var(--body);
+  font-size: 13px;
+}
+
+.switch a {
+  color: var(--ink);
+  text-decoration-color: var(--primary);
+  text-underline-offset: 3px;
+}
+
+@media (max-width: 900px) {
+  .auth-split {
+    grid-template-columns: 1fr;
+  }
+
+  .cinema {
+    min-height: 38vh;
+    padding: var(--space-md);
+  }
+
+  .panel {
+    padding: var(--space-lg) var(--space-md);
+  }
+}

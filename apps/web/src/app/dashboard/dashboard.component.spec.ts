@@ -1,0 +1,52 @@
+import { Component } from '@angular/core';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { Router, provideRouter } from '@angular/router';
+import { AuthService } from '../auth/auth.service';
+import { DashboardComponent } from './dashboard.component';
+
+@Component({ template: '' })
+class BlankComponent {}
+
+describe('DashboardComponent', () => {
+  let fixture: ComponentFixture<DashboardComponent>;
+  let httpMock: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports: [DashboardComponent],
+      providers: [
+        provideRouter([{ path: '**', component: BlankComponent }]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+      ],
+    });
+    httpMock = TestBed.inject(HttpTestingController);
+
+    TestBed.inject(AuthService).login('dev@sprintio.test', 'password123').subscribe();
+    httpMock.expectOne('/auth/login').flush({
+      accessToken: 'token-1',
+      user: { sub: '1', email: 'dev@sprintio.test', role: 'DEVELOPER' },
+    });
+
+    fixture = TestBed.createComponent(DashboardComponent);
+  });
+
+  afterEach(() => httpMock.verify());
+
+  it('shows the signed-in user', () => {
+    fixture.detectChanges();
+    const user: HTMLElement = fixture.nativeElement.querySelector('[data-testid="current-user"]');
+    expect(user.textContent).toBe('dev@sprintio.test');
+  });
+
+  it('logs out and returns to the login page', async () => {
+    fixture.componentInstance.logout();
+    httpMock.expectOne('/auth/logout').flush(null);
+
+    await fixture.whenStable();
+    expect(TestBed.inject(AuthService).isAuthenticated()).toBe(false);
+    expect(TestBed.inject(Router).url).toBe('/login');
+  });
+});

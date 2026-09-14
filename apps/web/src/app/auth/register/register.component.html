@@ -1,0 +1,39 @@
+<div class="auth-split">
+  <app-theme-toggle class="corner-toggle" />
+
+  <section class="cinema">
+    <p class="cinema-mark">Sprintio</p>
+    <div>
+      <p class="cinema-kicker label-caps">Take the grid</p>
+      <h1 class="cinema-headline">Your first lap starts here.</h1>
+    </div>
+  </section>
+
+  <main class="panel">
+    <h2 class="panel-title">Create account</h2>
+
+    <form [formGroup]="form" (ngSubmit)="submit()">
+      <label for="email" class="label-caps">Email</label>
+      <input id="email" type="email" formControlName="email" autocomplete="email" />
+
+      <label for="password" class="label-caps">Password</label>
+      <input
+        id="password"
+        type="password"
+        formControlName="password"
+        autocomplete="new-password"
+      />
+      <small class="hint">At least 8 characters.</small>
+
+      @if (error()) {
+        <p class="error" role="alert">{{ error() }}</p>
+      }
+
+      <button type="submit" class="btn btn-primary" [disabled]="form.invalid || pending()">
+        {{ pending() ? 'Creating account…' : 'Create account' }}
+      </button>
+    </form>
+
+    <p class="switch">Already registered? <a routerLink="/login">Sign in</a></p>
+  </main>
+</div>

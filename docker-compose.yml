@@ -22,6 +22,8 @@ services:
     environment:
       DATABASE_URL: postgresql://sprintio:sprintio@db:5432/sprintio?schema=public
       PORT: 3001
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in your environment or a .env file}
+      WEB_ORIGIN: http://localhost:4200
     ports:
       - '3001:3001'
     depends_on:

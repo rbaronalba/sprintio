@@ -8,6 +8,4 @@ import { RouterOutlet } from '@angular/router';
     changeDetection: ChangeDetectionStrategy.Eager,
     styleUrl: './app.component.scss'
 })
-export class AppComponent {
-  title = 'sprintio';
-}
+export class AppComponent {}

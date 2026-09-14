@@ -1,1 +1,150 @@
-/* You can add global styles to this file, and also import other style files */
+/* Ferrari design system — dark canvas is the brand base; the light theme is built
+   from the doc's own editorial-band tokens (canvas-light / body-on-light / surface-soft-light). */
+
+:root {
+  /* Brand voltage — constant across themes. Rosso Corsa is the only saturated color. */
+  --primary: #da291c;
+  --primary-active: #b01e0a;
+  --on-primary: #ffffff;
+
+  /* Spacing ladder */
+  --space-xxxs: 4px;
+  --space-xxs: 8px;
+  --space-xs: 16px;
+  --space-sm: 24px;
+  --space-md: 32px;
+  --space-lg: 48px;
+  --space-xl: 64px;
+  --space-xxl: 96px;
+  --space-super: 128px;
+
+  /* Radius — sharp by default. No pill radius: this project uses no badges. */
+  --radius-none: 0px;
+  --radius-sm: 4px;
+
+  --font-sans: 'Inter', -apple-system, system-ui, sans-serif;
+
+  /* Dark theme (brand default) */
+  --canvas: #181818;
+  --canvas-elevated: #303030;
+  --surface-card: #303030;
+  --ink: #ffffff;
+  --body: #969696;
+  --muted: #8f8f8f;
+  --hairline: #303030;
+  --cinema-gradient: linear-gradient(180deg, #3c3c3c, #030303 64%);
+  --input-bg: #181818;
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  --canvas: #ffffff;
+  --canvas-elevated: #f7f7f7;
+  --surface-card: #f7f7f7;
+  --ink: #181818;
+  --body: #666666;
+  --muted: #8f8f8f;
+  --hairline: #d2d2d2;
+  --cinema-gradient: linear-gradient(180deg, #303030, #181818 64%);
+  --input-bg: #ffffff;
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Display type never goes bold — the photography carries the weight. */
+h1,
+h2,
+h3 {
+  font-weight: 500;
+  margin: 0;
+}
+
+h1 {
+  font-size: 56px;
+  line-height: 1.1;
+  letter-spacing: -1.12px;
+}
+
+h2 {
+  font-size: 36px;
+  line-height: 1.2;
+  letter-spacing: -0.36px;
+}
+
+a {
+  color: var(--ink);
+}
+
+/* Hypersail yellow is the documented global focus ring. */
+:focus-visible {
+  outline: 2px solid #fff200;
+  outline-offset: 2px;
+}
+
+.label-caps {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 1.1px;
+  text-transform: uppercase;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  padding: 14px var(--space-md);
+  border: 0;
+  border-radius: var(--radius-none);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background-color 120ms linear;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: var(--on-primary);
+
+  &:active {
+    background: var(--primary-active);
+  }
+
+  &:disabled {
+    background: var(--canvas-elevated);
+    color: var(--muted);
+    cursor: not-allowed;
+  }
+}
+
+.btn-outline {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid currentColor;
+  padding: 13px 31px;
+}

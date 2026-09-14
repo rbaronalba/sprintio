@@ -1,0 +1,164 @@
+:host {
+  display: block;
+  min-height: 100vh;
+  background: var(--canvas);
+}
+
+.top-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  height: 64px;
+  padding: 0 var(--space-lg);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.mark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+}
+
+/* Stands in for the Cavallino mark — the brand's other sanctioned red. */
+.cavallino {
+  width: 10px;
+  height: 18px;
+  background: var(--primary);
+  clip-path: polygon(50% 0, 100% 38%, 78% 100%, 22% 100%, 0 38%);
+}
+
+.nav-links {
+  display: flex;
+  gap: var(--space-sm);
+  margin-inline-start: var(--space-md);
+}
+
+.nav-link {
+  color: var(--body);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.65px;
+  text-transform: uppercase;
+  padding: 15px 0;
+  transition: color 120ms linear;
+}
+
+.nav-link:hover {
+  color: var(--ink);
+}
+
+.nav-utils {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-inline-start: auto;
+}
+
+.nav-utils .btn {
+  height: 36px;
+  padding: 8px var(--space-xs);
+  font-size: 12px;
+}
+
+main {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: var(--space-xxl) var(--space-lg);
+}
+
+.kicker {
+  color: var(--primary);
+  margin: 0 0 var(--space-xs);
+}
+
+.hero h1 {
+  font-size: clamp(56px, 8vw, 80px);
+  letter-spacing: -1.6px;
+  line-height: 1.05;
+}
+
+.signed-in {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  flex-wrap: wrap;
+  margin: var(--space-sm) 0 0;
+  color: var(--body);
+}
+
+.signed-in strong {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.role {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1.1px;
+  text-transform: uppercase;
+}
+
+.role::before {
+  content: '/';
+  margin-inline-end: var(--space-xxs);
+}
+
+.specs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-lg);
+  margin-top: var(--space-super);
+  border-top: 1px solid var(--hairline);
+}
+
+.spec {
+  padding: var(--space-sm) 0;
+}
+
+.spec-value {
+  margin: 0;
+  font-size: 80px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -1.6px;
+  color: var(--ink);
+}
+
+/* Rosso Corsa on the lead figure only — the race-position treatment. */
+.spec-value--accent {
+  color: var(--primary);
+}
+
+.spec-label {
+  margin: var(--space-xxs) 0 0;
+  color: var(--muted);
+}
+
+@media (max-width: 900px) {
+  .top-nav {
+    padding: 0 var(--space-md);
+  }
+
+  .nav-links {
+    display: none;
+  }
+
+  main {
+    padding: var(--space-lg) var(--space-md);
+  }
+
+  .specs {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .specs .spec + .spec {
+    border-top: 1px solid var(--hairline);
+  }
+}

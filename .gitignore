@@ -5,6 +5,7 @@ dist
 tmp
 out-tsc
 bazel-out
+*.tsbuildinfo
 
 # Node
 node_modules
@@ -32,6 +33,11 @@ coverage
 libpeerconnection.log
 testem.log
 typings
+
+# Playwright
+playwright-report/
+test-results/
+.playwright/
 
 # Environment variables
 .env
