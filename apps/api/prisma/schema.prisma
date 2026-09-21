@@ -19,12 +19,51 @@ enum Role {
 }
 
 model User {
-  id                     String    @id @default(cuid())
-  email                  String    @unique
-  passwordHash           String
-  role                   Role      @default(DEVELOPER)
-  refreshTokenHash       String?
-  refreshTokenExpiresAt  DateTime?
-  createdAt              DateTime  @default(now())
-  updatedAt              DateTime  @updatedAt
+  id                    String    @id @default(cuid())
+  email                 String    @unique
+  passwordHash          String
+  role                  Role      @default(DEVELOPER)
+  refreshTokenHash      String?
+  refreshTokenExpiresAt DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  boards                Board[]
+}
+
+model Board {
+  id        String   @id @default(cuid())
+  title     String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId   String
+  lists     List[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+}
+
+model List {
+  id        String   @id @default(cuid())
+  title     String
+  position  Float
+  board     Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  boardId   String
+  cards     Card[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([boardId])
+}
+
+model Card {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  position    Float
+  list        List     @relation(fields: [listId], references: [id], onDelete: Cascade)
+  listId      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([listId])
 }

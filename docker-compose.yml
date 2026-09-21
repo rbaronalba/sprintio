@@ -3,7 +3,7 @@ services:
     image: postgres:16
     environment:
       POSTGRES_USER: sprintio
-      POSTGRES_PASSWORD: sprintio
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in your environment or a .env file}
       POSTGRES_DB: sprintio
     ports:
       - '5432:5432'
@@ -20,7 +20,7 @@ services:
       context: .
       dockerfile: apps/api/Dockerfile
     environment:
-      DATABASE_URL: postgresql://sprintio:sprintio@db:5432/sprintio?schema=public
+      DATABASE_URL: postgresql://sprintio:${POSTGRES_PASSWORD}@db:5432/sprintio?schema=public
       PORT: 3001
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in your environment or a .env file}
       WEB_ORIGIN: http://localhost:4200
