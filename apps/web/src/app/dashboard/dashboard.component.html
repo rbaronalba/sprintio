@@ -4,7 +4,7 @@
     Sprintio
   </span>
   <nav class="nav-links" aria-label="Main">
-    <a href="#" class="nav-link">Boards</a>
+    <a routerLink="/dashboard" class="nav-link">Boards</a>
     <a href="#" class="nav-link">Sprints</a>
     <a href="#" class="nav-link">Team</a>
   </nav>
@@ -26,9 +26,53 @@
     }
   </section>
 
+  <section class="boards" aria-label="Boards">
+    <ul class="board-grid">
+      @for (board of boards(); track board.id) {
+        <li class="board-tile">
+          <a [routerLink]="['/boards', board.id]">{{ board.title }}</a>
+          <button
+            type="button"
+            class="icon-btn"
+            (click)="askDelete(board)"
+            aria-label="Remove board"
+          >
+            &times;
+          </button>
+        </li>
+      }
+      <li class="board-tile board-tile--new">
+        @if (creating()) {
+          <form [formGroup]="form" (ngSubmit)="createBoard()">
+            <input
+              type="text"
+              formControlName="title"
+              placeholder="Board title"
+              aria-label="Board title"
+              autofocus
+              (keydown.escape)="creating.set(false)"
+            />
+            <div class="new-actions">
+              <button type="submit" class="btn btn-primary" [disabled]="form.invalid || pending()">
+                Create
+              </button>
+              <button type="button" class="icon-btn" aria-label="Cancel" (click)="creating.set(false)">
+                &times;
+              </button>
+            </div>
+          </form>
+        } @else {
+          <button type="button" class="new-trigger" (click)="creating.set(true)">
+            + Create new board
+          </button>
+        }
+      </li>
+    </ul>
+  </section>
+
   <section class="specs" aria-label="Sprint figures">
     <div class="spec">
-      <p class="spec-value spec-value--accent">0</p>
+      <p class="spec-value spec-value--accent">{{ boards().length }}</p>
       <p class="label-caps spec-label">Boards</p>
     </div>
     <div class="spec">
@@ -41,3 +85,14 @@
     </div>
   </section>
 </main>
+
+<dialog #confirmDialog class="confirm-dialog">
+  <p>
+    Are you sure you want to delete <strong>{{ pendingDelete()?.title }}</strong>? All its lists
+    and cards will be deleted too. This can't be undone.
+  </p>
+  <div class="dialog-actions">
+    <button type="button" class="btn btn-primary" (click)="confirmDelete()">Delete</button>
+    <button type="button" class="btn btn-outline" (click)="confirmDialog.close()">Cancel</button>
+  </div>
+</dialog>

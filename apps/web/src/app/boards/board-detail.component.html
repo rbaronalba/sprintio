@@ -1,0 +1,155 @@
+<header class="top-nav">
+  <a routerLink="/dashboard" class="mark">
+    <span class="cavallino" aria-hidden="true"></span>
+    Sprintio
+  </a>
+  <a routerLink="/dashboard" class="back">&larr; Boards</a>
+  <h1 class="board-title">{{ boardTitle() }}</h1>
+  <div class="nav-utils">
+    <app-theme-toggle />
+  </div>
+</header>
+
+<main>
+  <div
+    class="lists-row"
+    cdkDropList
+    cdkDropListOrientation="horizontal"
+    [cdkDropListData]="lists()"
+    (cdkDropListDropped)="dropList($event)"
+  >
+    @for (list of lists(); track list.id) {
+      <section class="list-col" cdkDrag>
+        <header class="list-header" cdkDragHandle>
+          @if (renaming() === list.id) {
+            <input
+              #titleInput
+              type="text"
+              class="rename"
+              [value]="list.title"
+              autofocus
+              (focus)="titleInput.select()"
+              (blur)="rename(list, titleInput)"
+              (keydown.enter)="titleInput.blur()"
+              (keydown.escape)="renaming.set(null)"
+            />
+          } @else {
+            <h2 (click)="renaming.set(list.id)">{{ list.title }}</h2>
+          }
+          <details #menu class="menu">
+            <summary class="icon-btn" aria-label="List actions">&hellip;</summary>
+            <button type="button" class="menu-item" (click)="menu.open = false; askDelete(list.title, () => removeList(list.id), 'All its cards will be deleted too.')">Delete list</button>
+          </details>
+        </header>
+
+        <div
+          class="card-drop"
+          cdkDropList
+          [id]="list.id"
+          [cdkDropListData]="list.cards"
+          [cdkDropListConnectedTo]="listIds"
+          (cdkDropListDropped)="dropCard($event, list)"
+        >
+          @for (card of list.cards; track card.id) {
+            <div
+              class="card"
+              cdkDrag
+              tabindex="0"
+              (cdkDragStarted)="onDragStart()"
+              (cdkDragEnded)="onDragEnd()"
+              (click)="openCard(card)"
+              (keydown.enter)="openCard(card)"
+            >
+              <span>{{ card.title }}</span>
+              <button
+                type="button"
+                class="icon-btn card-remove"
+                (click)="$event.stopPropagation(); askDeleteCard(card)"
+                aria-label="Remove card"
+              >
+                &times;
+              </button>
+            </div>
+          }
+        </div>
+
+        @if (addingIn() === list.id) {
+          <form class="composer" (submit)="$event.preventDefault(); addCard(list, cardInput)">
+            <input
+              #cardInput
+              type="text"
+              placeholder="Enter a title for this card"
+              autofocus
+              (keydown.escape)="addingIn.set(null)"
+            />
+            <div class="composer-actions">
+              <button type="submit" class="btn btn-primary">Add card</button>
+              <button type="button" class="icon-btn" aria-label="Cancel" (click)="addingIn.set(null)">
+                &times;
+              </button>
+            </div>
+          </form>
+        } @else {
+          <button type="button" class="ghost" (click)="addingIn.set(list.id)">+ Add a card</button>
+        }
+      </section>
+    }
+
+    @if (addingList()) {
+      <form class="list-col composer" (submit)="$event.preventDefault(); addList(listInput)">
+        <input
+          #listInput
+          type="text"
+          placeholder="Enter list title"
+          autofocus
+          (keydown.escape)="addingList.set(false)"
+        />
+        <div class="composer-actions">
+          <button type="submit" class="btn btn-primary">Add list</button>
+          <button type="button" class="icon-btn" aria-label="Cancel" (click)="addingList.set(false)">
+            &times;
+          </button>
+        </div>
+      </form>
+    } @else {
+      <button type="button" class="ghost add-list" (click)="addingList.set(true)">
+        + Add another list
+      </button>
+    }
+  </div>
+</main>
+
+<dialog #cardDialog class="card-dialog">
+  @if (editing(); as card) {
+    <form (submit)="$event.preventDefault(); saveCard(titleField.value, descField.value)">
+      <label class="label-caps" for="card-title">Title</label>
+      <input #titleField id="card-title" type="text" [value]="card.title" maxlength="200" />
+      <label class="label-caps" for="card-desc">Description</label>
+      <textarea
+        #descField
+        id="card-desc"
+        rows="6"
+        maxlength="5000"
+        placeholder="Add a more detailed description"
+        [value]="card.description ?? ''"
+      ></textarea>
+      <div class="dialog-actions">
+        <button type="submit" class="btn btn-primary">Save</button>
+        <button type="button" class="btn btn-outline" (click)="cardDialog.close()">Cancel</button>
+        <button type="button" class="icon-btn danger" (click)="askDeleteCard(card)">Delete card</button>
+      </div>
+    </form>
+  }
+</dialog>
+
+<dialog #confirmDialog class="card-dialog confirm-dialog">
+  <p>
+    Are you sure you want to delete
+    <strong>{{ pendingDelete()?.name }}</strong>? {{ pendingDelete()?.note }}
+    This can't be undone.
+  </p>
+  <div class="dialog-actions">
+    <button type="button" class="btn btn-primary" (click)="confirmDelete()">Delete</button>
+    <button type="button" class="btn btn-outline" (click)="confirmDialog.close()">Cancel</button>
+  </div>
+</dialog>

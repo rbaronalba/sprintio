@@ -18,9 +18,11 @@
   --space-xxl: 96px;
   --space-super: 128px;
 
-  /* Radius — sharp by default. No pill radius: this project uses no badges. */
+  /* Radius — rounded, Trello-style. No pill radius: this project uses no badges. */
   --radius-none: 0px;
   --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
 
   --font-sans: 'Inter', -apple-system, system-ui, sans-serif;
 
@@ -116,7 +118,7 @@ a {
   height: 48px;
   padding: 14px var(--space-md);
   border: 0;
-  border-radius: var(--radius-none);
+  border-radius: var(--radius-md);
   font: inherit;
   font-size: 14px;
   font-weight: 700;
@@ -147,4 +149,18 @@ a {
   color: var(--ink);
   border: 1px solid currentColor;
   padding: 13px 31px;
+}
+
+input[type='text'] {
+  height: 40px;
+  padding: 8px var(--space-xs);
+  background: var(--input-bg);
+  color: var(--ink);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  font: inherit;
+}
+
+input[type='text']:focus {
+  border-color: var(--ink);
 }
