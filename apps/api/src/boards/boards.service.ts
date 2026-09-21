@@ -1,5 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+
+const MAX_BOARDS_PER_USER = 100;
 
 @Injectable()
 export class BoardsService {
@@ -9,7 +11,10 @@ export class BoardsService {
     return this.prisma.board.findMany({ where: { ownerId }, orderBy: { createdAt: 'desc' } });
   }
 
-  create(ownerId: string, title: string) {
+  async create(ownerId: string, title: string) {
+    if ((await this.prisma.board.count({ where: { ownerId } })) >= MAX_BOARDS_PER_USER) {
+      throw new BadRequestException('Board limit reached');
+    }
     return this.prisma.board.create({ data: { title, ownerId } });
   }
 

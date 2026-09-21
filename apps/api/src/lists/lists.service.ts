@@ -1,6 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { UpsertListInput } from './dto.js';
+
+const MAX_LISTS_PER_BOARD = 30;
 
 @Injectable()
 export class ListsService {
@@ -22,6 +24,9 @@ export class ListsService {
 
   async create(ownerId: string, boardId: string, title: string) {
     await this.assertBoardOwned(ownerId, boardId);
+    if ((await this.prisma.list.count({ where: { boardId } })) >= MAX_LISTS_PER_BOARD) {
+      throw new BadRequestException('List limit reached');
+    }
     const last = await this.prisma.list.findFirst({
       where: { boardId },
       orderBy: { position: 'desc' },

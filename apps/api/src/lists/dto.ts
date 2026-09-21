@@ -1,5 +1,8 @@
 import { BadRequestException } from '@nestjs/common';
 
+// Floats lose ordering precision when they grow or get bisected without bound.
+const MAX_POSITION = 1e9;
+
 export interface UpsertListInput {
   title?: string;
   position?: number;
@@ -20,8 +23,8 @@ export function parseUpsertList(body: unknown): UpsertListInput {
   }
 
   if (position !== undefined) {
-    if (typeof position !== 'number' || !Number.isFinite(position)) {
-      throw new BadRequestException('Position must be a finite number');
+    if (typeof position !== 'number' || !Number.isFinite(position) || Math.abs(position) > MAX_POSITION) {
+      throw new BadRequestException(`Position must be a number within ±${MAX_POSITION}`);
     }
     result.position = position;
   }

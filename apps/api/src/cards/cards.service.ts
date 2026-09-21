@@ -1,6 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { UpsertCardInput } from './dto.js';
+
+const MAX_CARDS_PER_LIST = 200;
 
 @Injectable()
 export class CardsService {
@@ -11,8 +13,15 @@ export class CardsService {
     if (!list) throw new NotFoundException('List not found');
   }
 
+  private async assertRoom(listId: string) {
+    if ((await this.prisma.card.count({ where: { listId } })) >= MAX_CARDS_PER_LIST) {
+      throw new BadRequestException('Card limit reached');
+    }
+  }
+
   async create(ownerId: string, listId: string, title: string) {
     await this.assertListOwned(ownerId, listId);
+    await this.assertRoom(listId);
     const last = await this.prisma.card.findFirst({
       where: { listId },
       orderBy: { position: 'desc' },
@@ -31,8 +40,11 @@ export class CardsService {
   }
 
   async update(ownerId: string, id: string, input: UpsertCardInput) {
-    await this.findOwned(ownerId, id);
-    if (input.listId) await this.assertListOwned(ownerId, input.listId);
+    const card = await this.findOwned(ownerId, id);
+    if (input.listId) {
+      await this.assertListOwned(ownerId, input.listId);
+      if (input.listId !== card.listId) await this.assertRoom(input.listId);
+    }
     return this.prisma.card.update({ where: { id }, data: input });
   }
 
