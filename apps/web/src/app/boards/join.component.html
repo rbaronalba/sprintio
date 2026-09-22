@@ -1,0 +1,32 @@
+<header class="top-nav">
+  <a routerLink="/dashboard" class="mark">
+    <span class="cavallino" aria-hidden="true"></span>
+    Sprintio
+  </a>
+  <div class="nav-utils">
+    <app-theme-toggle />
+  </div>
+</header>
+
+<main>
+  @if (invalid()) {
+    <p class="label-caps kicker">Invitation</p>
+    <h1>Link not valid.</h1>
+    <p class="lead">
+      This invitation was revoked, is full, or never existed. Ask the owner for a new link.
+    </p>
+    <a routerLink="/dashboard" class="btn btn-outline">Go to my boards</a>
+  } @else if (invite(); as invite) {
+    <p class="label-caps kicker">You have been invited</p>
+    <h1>{{ invite.title }}</h1>
+    @if (invite.isMember) {
+      <p class="lead">You are already a member of this board.</p>
+      <a [routerLink]="['/boards', invite.boardId]" class="btn btn-primary">Open board</a>
+    } @else {
+      <p class="lead">Join to see its lists and assign yourself to cards.</p>
+      <button type="button" class="btn btn-primary" [disabled]="pending()" (click)="join()">
+        Join board
+      </button>
+    }
+  }
+</main>

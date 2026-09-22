@@ -31,14 +31,16 @@
       @for (board of boards(); track board.id) {
         <li class="board-tile">
           <a [routerLink]="['/boards', board.id]">{{ board.title }}</a>
-          <button
-            type="button"
-            class="icon-btn"
-            (click)="askDelete(board)"
-            aria-label="Remove board"
-          >
-            &times;
-          </button>
+          @if (board.ownerId === auth.currentUser()?.sub) {
+            <button
+              type="button"
+              class="icon-btn"
+              (click)="askDelete(board)"
+              aria-label="Remove board"
+            >
+              &times;
+            </button>
+          }
         </li>
       }
       <li class="board-tile board-tile--new">

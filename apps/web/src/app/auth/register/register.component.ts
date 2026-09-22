@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../auth.service';
 import { ThemeToggleComponent } from '../../theme-toggle/theme-toggle.component';
 
@@ -14,6 +14,7 @@ import { ThemeToggleComponent } from '../../theme-toggle/theme-toggle.component'
 export class RegisterComponent {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   readonly pending = signal(false);
   readonly error = signal<string | null>(null);
@@ -30,7 +31,11 @@ export class RegisterComponent {
 
     const { email, password } = this.form.getRawValue();
     this.auth.register(email, password).subscribe({
-      next: () => void this.router.navigate(['/dashboard']),
+      next: () => {
+        // Only in-app paths: a returnUrl like '//evil.com' must never leave the site.
+        const back = this.route.snapshot.queryParamMap.get('returnUrl');
+        void this.router.navigateByUrl(back?.startsWith('/') && !back.startsWith('//') ? back : '/dashboard');
+      },
       error: (err) => {
         this.pending.set(false);
         this.error.set(err.status === 409 ? 'That email is already registered' : 'Sign up failed');

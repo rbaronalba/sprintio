@@ -19,25 +19,29 @@ enum Role {
 }
 
 model User {
-  id                    String    @id @default(cuid())
-  email                 String    @unique
+  id                    String        @id @default(cuid())
+  email                 String        @unique
   passwordHash          String
-  role                  Role      @default(DEVELOPER)
+  role                  Role          @default(DEVELOPER)
   refreshTokenHash      String?
   refreshTokenExpiresAt DateTime?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
   boards                Board[]
+  memberships           BoardMember[]
+  assignments           CardMember[]
 }
 
 model Board {
-  id        String   @id @default(cuid())
-  title     String
-  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  ownerId   String
-  lists     List[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String        @id @default(cuid())
+  title       String
+  owner       User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId     String
+  inviteToken String?       @unique
+  lists       List[]
+  members     BoardMember[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 
   @@index([ownerId])
 }
@@ -56,14 +60,36 @@ model List {
 }
 
 model Card {
-  id          String   @id @default(cuid())
+  id          String       @id @default(cuid())
   title       String
   description String?
   position    Float
-  list        List     @relation(fields: [listId], references: [id], onDelete: Cascade)
+  list        List         @relation(fields: [listId], references: [id], onDelete: Cascade)
   listId      String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  assignees   CardMember[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
   @@index([listId])
+}
+
+model BoardMember {
+  board    Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  boardId  String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId   String
+  joinedAt DateTime @default(now())
+
+  @@id([boardId, userId])
+  @@index([userId])
+}
+
+model CardMember {
+  card   Card   @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  cardId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  @@id([cardId, userId])
+  @@index([userId])
 }

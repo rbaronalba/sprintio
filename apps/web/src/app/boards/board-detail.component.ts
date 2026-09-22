@@ -1,5 +1,5 @@
-import { ChangeDetectionStrategy, Component, ElementRef, inject, signal, viewChild } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
   CdkDrag,
   CdkDragDrop,
@@ -9,7 +9,8 @@ import {
   transferArrayItem,
 } from '@angular/cdk/drag-drop';
 import { ThemeToggleComponent } from '../theme-toggle/theme-toggle.component';
-import { BoardsService } from './boards.service';
+import { AuthService } from '../auth/auth.service';
+import { BoardDetail, BoardsService, Member } from './boards.service';
 import { BoardService, Card, List } from './board.service';
 import { positionAt } from './position';
 
@@ -24,10 +25,27 @@ export class BoardDetailComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly api = inject(BoardService);
   private readonly boardsApi = inject(BoardsService);
+  private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
 
   readonly boardId = this.route.snapshot.paramMap.get('id')!;
   readonly lists = signal<List[]>([]);
-  readonly boardTitle = signal('');
+  readonly board = signal<BoardDetail | null>(null);
+  readonly members = computed(() => this.board()?.members ?? []);
+  readonly isOwner = computed(() => {
+    const board = this.board();
+    return board !== null && board.ownerId === this.auth.currentUser()?.sub;
+  });
+  readonly shareLink = computed(() => {
+    const token = this.board()?.inviteToken;
+    return token ? `${location.origin}/join/${token}` : null;
+  });
+  readonly popoverCardId = signal<string | null>(null);
+  readonly popoverCard = computed(
+    () => this.lists().flatMap((l) => l.cards).find((c) => c.id === this.popoverCardId()) ?? null,
+  );
+  private readonly memberPop = viewChild.required<ElementRef<HTMLElement>>('memberPop');
+  private readonly shareDialog = viewChild.required<ElementRef<HTMLDialogElement>>('shareDialog');
   readonly addingIn = signal<string | null>(null);
   readonly addingList = signal(false);
   readonly renaming = signal<string | null>(null);
@@ -43,10 +61,10 @@ export class BoardDetailComponent {
 
   constructor() {
     this.api.listLists(this.boardId).subscribe((lists) => this.lists.set(lists));
-    // ponytail: no GET /boards/:id yet, so find the title in the list
-    this.boardsApi
-      .list()
-      .subscribe((boards) => this.boardTitle.set(boards.find((b) => b.id === this.boardId)?.title ?? ''));
+    this.boardsApi.get(this.boardId).subscribe({
+      next: (board) => this.board.set(board),
+      error: () => void this.router.navigate(['/dashboard']),
+    });
   }
 
   addList(input: HTMLInputElement): void {
@@ -159,5 +177,68 @@ export class BoardDetailComponent {
     this.pendingDelete()?.run();
     this.confirmDialog().nativeElement.close();
     this.dialog().nativeElement.close();
+  }
+
+  emailOf(userId: string): string {
+    return this.members().find((m) => m.userId === userId)?.email ?? '?';
+  }
+
+  initial(email: string): string {
+    return email.charAt(0).toUpperCase();
+  }
+
+  isAssigned(card: Card, userId: string): boolean {
+    return card.assignees.some((a) => a.userId === userId);
+  }
+
+  openMembers(card: Card, button: HTMLElement): void {
+    if (this.dragging) return;
+    const pop = this.memberPop().nativeElement;
+    if (pop.matches(':popover-open')) pop.hidePopover();
+    this.popoverCardId.set(card.id);
+    const rect = button.getBoundingClientRect();
+    pop.style.top = `${rect.bottom + 4}px`;
+    pop.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - 272))}px`;
+    pop.showPopover();
+  }
+
+  toggleAssignee(card: Card, member: Member): void {
+    const assigned = this.isAssigned(card, member.userId);
+    const request = assigned
+      ? this.api.unassign(card.id, member.userId)
+      : this.api.assign(card.id, member.userId);
+    request.subscribe(() => {
+      const assignees = assigned
+        ? card.assignees.filter((a) => a.userId !== member.userId)
+        : [...card.assignees, { userId: member.userId }];
+      this.lists.update((lists) =>
+        lists.map((l) => ({ ...l, cards: l.cards.map((c) => (c.id === card.id ? { ...c, assignees } : c)) })),
+      );
+    });
+  }
+
+  openShare(): void {
+    this.shareDialog().nativeElement.showModal();
+  }
+
+  createInvite(): void {
+    this.boardsApi.createInvite(this.boardId).subscribe(({ token }) => {
+      this.board.update((b) => (b ? { ...b, inviteToken: token } : b));
+    });
+  }
+
+  stopSharing(): void {
+    this.boardsApi.revokeInvite(this.boardId).subscribe(() => {
+      this.board.update((b) => (b ? { ...b, inviteToken: null } : b));
+    });
+  }
+
+  async copyLink(input: HTMLInputElement): Promise<void> {
+    input.select();
+    try {
+      await navigator.clipboard.writeText(input.value);
+    } catch {
+      // Clipboard needs a secure context; the link stays selected so Ctrl+C still works.
+    }
   }
 }

@@ -1,0 +1,61 @@
+:host {
+  display: block;
+  min-height: 100vh;
+  background: var(--canvas);
+}
+
+.top-nav {
+  display: flex;
+  align-items: center;
+  height: 64px;
+  padding: 0 var(--space-lg);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.mark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.cavallino {
+  width: 10px;
+  height: 18px;
+  background: var(--primary);
+  clip-path: polygon(50% 0, 100% 38%, 78% 100%, 22% 100%, 0 38%);
+}
+
+.nav-utils {
+  margin-inline-start: auto;
+}
+
+main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: var(--space-xxl) var(--space-lg);
+}
+
+.kicker {
+  color: var(--primary);
+  margin: 0 0 var(--space-xs);
+}
+
+h1 {
+  overflow-wrap: anywhere;
+}
+
+.lead {
+  margin: var(--space-sm) 0 var(--space-md);
+  color: var(--body);
+  font-size: 16px;
+}
+
+.btn {
+  text-decoration: none;
+}

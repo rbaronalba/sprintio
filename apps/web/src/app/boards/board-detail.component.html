@@ -4,7 +4,15 @@
     Sprintio
   </a>
   <a routerLink="/dashboard" class="back">&larr; Boards</a>
-  <h1 class="board-title">{{ boardTitle() }}</h1>
+  <h1 class="board-title">{{ board()?.title }}</h1>
+  <div class="members" aria-label="Board members">
+    @for (m of members(); track m.userId) {
+      <span class="avatar" [title]="m.email">{{ initial(m.email) }}</span>
+    }
+  </div>
+  @if (isOwner()) {
+    <button type="button" class="btn btn-outline share" (click)="openShare()">Share</button>
+  }
   <div class="nav-utils">
     <app-theme-toggle />
   </div>
@@ -60,15 +68,30 @@
               (click)="openCard(card)"
               (keydown.enter)="openCard(card)"
             >
-              <span>{{ card.title }}</span>
-              <button
-                type="button"
-                class="icon-btn card-remove"
-                (click)="$event.stopPropagation(); askDeleteCard(card)"
-                aria-label="Remove card"
-              >
-                &times;
-              </button>
+              <span class="card-title">{{ card.title }}</span>
+              <span class="card-tools">
+                @for (a of card.assignees; track a.userId) {
+                  <span class="avatar" [title]="emailOf(a.userId)">{{ initial(emailOf(a.userId)) }}</span>
+                }
+                <button
+                  type="button"
+                  class="icon-btn card-tool"
+                  aria-label="Members"
+                  (click)="$event.stopPropagation(); openMembers(card, $any($event.currentTarget))"
+                  (keydown.enter)="$event.stopPropagation()"
+                >
+                  +
+                </button>
+                <button
+                  type="button"
+                  class="icon-btn card-tool"
+                  aria-label="Remove card"
+                  (click)="$event.stopPropagation(); askDeleteCard(card)"
+                  (keydown.enter)="$event.stopPropagation()"
+                >
+                  &times;
+                </button>
+              </span>
             </div>
           }
         </div>
@@ -152,4 +175,45 @@
     <button type="button" class="btn btn-primary" (click)="confirmDelete()">Delete</button>
     <button type="button" class="btn btn-outline" (click)="confirmDialog.close()">Cancel</button>
   </div>
+</dialog>
+
+<div #memberPop popover class="member-pop">
+  <p class="label-caps pop-title">Members</p>
+  @if (popoverCard(); as card) {
+    <ul>
+      @for (m of members(); track m.userId) {
+        <li>
+          <button type="button" class="member-row" (click)="toggleAssignee(card, m)">
+            <span class="avatar">{{ initial(m.email) }}</span>
+            <span class="member-email">{{ m.email }}</span>
+            @if (isAssigned(card, m.userId)) {
+              <span class="check" aria-label="Assigned">&#10003;</span>
+            }
+          </button>
+        </li>
+      }
+    </ul>
+  }
+</div>
+
+<dialog #shareDialog class="card-dialog share-dialog">
+  <p class="label-caps">Share this board</p>
+  @if (shareLink(); as link) {
+    <p class="share-note">
+      Anyone signed in who opens this link can join the board. Stopping sharing kills the link;
+      people who already joined keep access.
+    </p>
+    <input #linkInput type="text" readonly [value]="link" aria-label="Invitation link" />
+    <div class="dialog-actions">
+      <button type="button" class="btn btn-primary" (click)="copyLink(linkInput)">Copy link</button>
+      <button type="button" class="btn btn-outline" (click)="stopSharing()">Stop sharing</button>
+      <button type="button" class="icon-btn danger" (click)="shareDialog.close()">Close</button>
+    </div>
+  } @else {
+    <p class="share-note">Create a link to invite people to this board.</p>
+    <div class="dialog-actions">
+      <button type="button" class="btn btn-primary" (click)="createInvite()">Create invite link</button>
+      <button type="button" class="icon-btn danger" (click)="shareDialog.close()">Close</button>
+    </div>
+  }
 </dialog>

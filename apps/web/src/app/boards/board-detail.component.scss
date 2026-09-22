@@ -139,12 +139,27 @@ main {
   border-color: var(--primary);
 }
 
-.card-remove {
-  opacity: 0;
+.card-title {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
-.card:hover .card-remove,
-.card-remove:focus-visible {
+.card-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xxxs);
+  flex: none;
+}
+
+.card-tool {
+  opacity: 0;
+  font-size: 18px;
+  padding: 0 var(--space-xxxs);
+}
+
+.card:hover .card-tool,
+.card-tool:focus-visible {
   opacity: 1;
 }
 
@@ -318,4 +333,94 @@ main {
 .confirm-dialog p {
   margin: 0;
   overflow-wrap: anywhere;
+}
+
+.members {
+  display: flex;
+  gap: var(--space-xxxs);
+}
+
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--canvas);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.share {
+  height: 36px;
+  padding: 7px calc(var(--space-xs) - 1px);
+  font-size: 12px;
+}
+
+.member-pop {
+  inset: auto;
+  margin: 0;
+  width: 264px;
+  padding: var(--space-xs);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: var(--canvas-elevated);
+  color: var(--ink);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.pop-title {
+  margin: 0 0 var(--space-xxs);
+  color: var(--body);
+}
+
+.member-pop ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.member-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  width: 100%;
+  padding: var(--space-xxs);
+  border: none;
+  border-radius: var(--radius-md);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.member-row:hover {
+  background: var(--canvas);
+}
+
+.member-email {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.check {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.share-dialog {
+  width: min(520px, 92vw);
+}
+
+.share-note {
+  margin: var(--space-xs) 0;
+  color: var(--body);
 }

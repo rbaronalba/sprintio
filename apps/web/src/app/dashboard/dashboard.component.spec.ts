@@ -36,12 +36,25 @@ describe('DashboardComponent', () => {
   afterEach(() => httpMock.verify());
 
   it('shows the signed-in user', () => {
+    httpMock.expectOne('/boards').flush([]);
     fixture.detectChanges();
     const user: HTMLElement = fixture.nativeElement.querySelector('[data-testid="current-user"]');
     expect(user.textContent).toBe('dev@sprintio.test');
   });
 
+  it('only offers deleting boards the user owns', () => {
+    const board = (id: string, ownerId: string) => ({ id, title: `Board ${id}`, ownerId });
+    httpMock.expectOne('/boards').flush([board('mine', '1'), board('shared', '9')]);
+    fixture.detectChanges();
+
+    const rows: HTMLElement[] = Array.from(fixture.nativeElement.querySelectorAll('.board-tile:not(.board-tile--new)'));
+    expect(rows.length).toBe(2);
+    expect(rows[0].querySelector('button[aria-label="Remove board"]')).not.toBeNull();
+    expect(rows[1].querySelector('button[aria-label="Remove board"]')).toBeNull();
+  });
+
   it('logs out and returns to the login page', async () => {
+    httpMock.expectOne('/boards').flush([]);
     fixture.componentInstance.logout();
     httpMock.expectOne('/auth/logout').flush(null);
 

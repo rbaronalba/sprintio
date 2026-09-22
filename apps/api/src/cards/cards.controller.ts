@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   UseGuards,
 } from '@nestjs/common';
 import { CardsService } from './cards.service.js';
@@ -40,5 +41,15 @@ export class CardsController {
   @Delete(':id')
   remove(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.cards.remove(user.sub, id);
+  }
+
+  @Put(':id/members/:userId')
+  assign(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Param('userId') userId: string) {
+    return this.cards.assign(user.sub, id, userId);
+  }
+
+  @Delete(':id/members/:userId')
+  unassign(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Param('userId') userId: string) {
+    return this.cards.unassign(user.sub, id, userId);
   }
 }

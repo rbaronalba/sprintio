@@ -20,6 +20,11 @@ export const routes: Routes = [
       import('./dashboard/dashboard.component').then((m) => m.DashboardComponent),
   },
   {
+    path: 'join/:token',
+    canActivate: [authGuard],
+    loadComponent: () => import('./boards/join.component').then((m) => m.JoinComponent),
+  },
+  {
     path: 'boards/:id',
     canActivate: [authGuard],
     loadComponent: () =>

@@ -6,6 +6,7 @@ export interface Card {
   id: string;
   title: string;
   description: string | null;
+  assignees: { userId: string }[];
   position: number;
   listId: string;
 }
@@ -56,5 +57,13 @@ export class BoardService {
 
   removeCard(id: string): Observable<unknown> {
     return this.http.delete(`/cards/${id}`);
+  }
+
+  assign(cardId: string, userId: string): Observable<unknown> {
+    return this.http.put(`/cards/${cardId}/members/${userId}`, {});
+  }
+
+  unassign(cardId: string, userId: string): Observable<unknown> {
+    return this.http.delete(`/cards/${cardId}/members/${userId}`);
   }
 }
