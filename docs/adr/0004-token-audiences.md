@@ -27,7 +27,9 @@ expects:
 | Refresh | `sprintio:refresh` | `AuthService.refresh()` |
 | Stream ticket | `sprintio:stream` | `EventsController.stream()` |
 
-A token minted with no audience at all is rejected everywhere.
+A token minted with no audience at all is rejected everywhere. The algorithm is pinned
+too (`HS256` to sign, `algorithms: ['HS256']` on every verify), and `JWT_SECRET` must be
+at least 32 characters or the API refuses to boot.
 
 `src/auth/token-audience.spec.ts` asserts each cross-use is refused, because the whole
 point is that these are valid signatures over our own secret — nothing but the audience

@@ -5,11 +5,13 @@ import { AuthService } from './auth.service.js';
 import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
 import { RolesGuard } from './guards/roles.guard.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { JWT_ALGORITHM } from './auth.service.js';
 
 const jwtSecret = process.env.JWT_SECRET;
-if (!jwtSecret) {
-  // Without this the app would boot and hand out tokens nobody can trust.
-  throw new Error('JWT_SECRET is not set');
+// Without this the app would boot and hand out tokens nobody can trust. HS256 is only as
+// strong as its key, and a short one can be brute-forced offline from any token we issue.
+if (!jwtSecret || jwtSecret.length < 32) {
+  throw new Error('JWT_SECRET must be set and at least 32 characters');
 }
 
 @Module({
@@ -17,6 +19,7 @@ if (!jwtSecret) {
     JwtModule.register({
       global: true,
       secret: jwtSecret,
+      signOptions: { algorithm: JWT_ALGORITHM },
     }),
   ],
   controllers: [AuthController],

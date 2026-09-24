@@ -39,10 +39,14 @@ playwright-report/
 test-results/
 .playwright/
 
-# Environment variables
+# Environment variables and key material
 .env
-.env.local
+.env.*
 !.env.example
+*.pem
+*.key
+*.p12
+*.pfx
 
 # System files
 .DS_Store

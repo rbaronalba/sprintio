@@ -20,6 +20,12 @@ export class JoinComponent {
   readonly pending = signal(false);
 
   constructor() {
+    // Invite tokens are 48 hex chars. Anything else never reaches the API, so a crafted
+    // link like /join/..%2F..%2Fauth%2Flogout cannot steer the request elsewhere.
+    if (!/^[0-9a-f]{48}$/.test(this.token)) {
+      this.invalid.set(true);
+      return;
+    }
     this.api.previewInvite(this.token).subscribe({
       next: (invite) => this.invite.set(invite),
       error: () => this.invalid.set(true),

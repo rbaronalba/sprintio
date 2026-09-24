@@ -14,6 +14,7 @@ import type { Request, Response } from 'express';
 import { AuthService, REFRESH_TOKEN_TTL_MS } from './auth.service.js';
 import { parseCredentials, parseDisplayName } from './dto.js';
 import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
+import { EmailThrottlerGuard } from './guards/email-throttler.guard.js';
 import { CurrentUser } from './decorators/current-user.decorator.js';
 import type { JwtPayload } from './auth.service.js';
 
@@ -35,6 +36,7 @@ export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
   @Throttle(AUTH_LIMIT)
+  @UseGuards(EmailThrottlerGuard)
   @Post('register')
   async register(@Body() body: unknown, @Res({ passthrough: true }) res: Response) {
     const { email, password } = parseCredentials(body);
@@ -44,6 +46,7 @@ export class AuthController {
   }
 
   @Throttle(AUTH_LIMIT)
+  @UseGuards(EmailThrottlerGuard)
   @Post('login')
   async login(@Body() body: unknown, @Res({ passthrough: true }) res: Response) {
     const { email, password } = parseCredentials(body);
@@ -65,8 +68,12 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Post('logout')
-  async logout(@CurrentUser() user: JwtPayload, @Res({ passthrough: true }) res: Response) {
-    await this.auth.logout(user.sub);
+  async logout(
+    @CurrentUser() user: JwtPayload,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    await this.auth.logout(user.sub, req.cookies?.[REFRESH_COOKIE]);
     res.clearCookie(REFRESH_COOKIE);
     return { success: true };
   }
@@ -84,7 +91,9 @@ export class AuthController {
     return this.auth.updateProfile(user.sub, parseDisplayName(body));
   }
 
-  private setRefreshCookie(res: Response, token: string) {
+  private setRefreshCookie(res: Response, token: string | null) {
+    // Null inside the rotation grace window: this browser's cookie is already current.
+    if (!token) return;
     res.cookie(REFRESH_COOKIE, token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',

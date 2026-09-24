@@ -66,6 +66,19 @@ describe('EventsService', () => {
     expect(messages[0]?.boardId).toBe('b3');
   });
 
+  it('narrows the stream when the subscriber is removed, after telling them', async () => {
+    const service = new EventsService(stubPrisma(['b1', 'b2']) as never);
+    const received = firstValueFrom(service.streamFor('u1').pipe(take(2), toArray()));
+    await new Promise((resolve) => setTimeout(resolve));
+
+    await service.record({ type: 'MEMBER_REMOVED', boardId: 'b1', actorId: 'owner', data: { userId: 'u1' } });
+    await service.record({ type: 'CARD_CREATED', boardId: 'b1', actorId: 'owner' });
+    await service.record({ type: 'CARD_CREATED', boardId: 'b2', actorId: 'owner' });
+
+    const messages = await received;
+    expect(messages.map((m) => `${m.type}@${m.boardId}`)).toEqual(['MEMBER_REMOVED@b1', 'CARD_CREATED@b2']);
+  });
+
   it('notifies the targets but never the actor, and marks recipients per subscriber', async () => {
     const created: unknown[] = [];
     const service = new EventsService(stubPrisma(['b1'], created) as never);

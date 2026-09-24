@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
+import { TitleCasePipe } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
   CdkDrag,
@@ -31,6 +32,7 @@ export const LABEL_COLORS = ['#c8102e', '#e08a1e', '#d9c22e', '#3f8f4f', '#2e7fd
     CdkDropList,
     CdkDrag,
     CdkDragHandle,
+    TitleCasePipe,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './board-detail.component.html',
@@ -81,7 +83,8 @@ export class BoardDetailComponent {
   readonly renaming = signal<string | null>(null);
   readonly editing = signal<Card | null>(null);
   private readonly dialog = viewChild.required<ElementRef<HTMLDialogElement>>('cardDialog');
-  readonly pendingDelete = signal<{ name: string; note?: string; run: () => void } | null>(null);
+  /** `verb` replaces "delete" for actions that can be undone (removing a member, leaving). */
+  readonly pendingDelete = signal<{ name: string; note?: string; verb?: string; run: () => void } | null>(null);
   private readonly confirmDialog = viewChild.required<ElementRef<HTMLDialogElement>>('confirmDialog');
   private dragging = false;
   /** A remote change that arrived mid-drag, replayed once the drag finishes. */
@@ -100,6 +103,12 @@ export class BoardDetailComponent {
   }
 
   constructor() {
+    // Board ids are cuids. Anything else (say ..%2F..%2Fauth) would be interpolated into
+    // API paths and could steer requests elsewhere on this origin.
+    if (!/^[a-z0-9]+$/.test(this.boardId)) {
+      void this.router.navigate(['/dashboard']);
+      return;
+    }
     this.api.listLists(this.boardId).subscribe((lists) => {
       this.lists.set(lists);
       this.openCardFromQuery();
@@ -123,6 +132,13 @@ export class BoardDetailComponent {
         takeUntilDestroyed(),
       )
       .subscribe((message) => {
+        if (message.type === 'MEMBER_REMOVED' && message.data['userId'] === this.currentUserId) {
+          void this.router.navigate(['/dashboard']);
+          return;
+        }
+        if (message.type.startsWith('MEMBER_')) {
+          this.boardsApi.get(this.boardId).subscribe((board) => this.board.set(board));
+        }
         this.remoteChange.next();
         // Refresh the open card's own panes too, so a comment from someone else
         // shows up without closing and reopening the modal.
@@ -307,6 +323,37 @@ export class BoardDetailComponent {
 
   askDelete(name: string, run: () => void, note?: string): void {
     this.pendingDelete.set({ name, note, run });
+    this.confirmDialog().nativeElement.showModal();
+  }
+
+  askRemoveMember(member: Member): void {
+    this.pendingDelete.set({
+      name: member.email,
+      verb: 'remove',
+      note: 'They lose access to this board and are unassigned from its cards.',
+      run: () =>
+        this.boardsApi.removeMember(this.boardId, member.userId).subscribe(() => {
+          this.board.update((b) => (b ? { ...b, members: b.members.filter((m) => m.userId !== member.userId) } : b));
+          this.lists.update((lists) =>
+            lists.map((l) => ({
+              ...l,
+              cards: l.cards.map((c) => ({ ...c, assignees: c.assignees.filter((a) => a.userId !== member.userId) })),
+            })),
+          );
+        }),
+    });
+    this.confirmDialog().nativeElement.showModal();
+  }
+
+  askLeave(): void {
+    const me = this.currentUserId;
+    if (!me) return;
+    this.pendingDelete.set({
+      name: this.board()?.title ?? 'this board',
+      verb: 'leave',
+      note: 'You will need a new invite link to come back.',
+      run: () => this.boardsApi.removeMember(this.boardId, me).subscribe(() => void this.router.navigate(['/dashboard'])),
+    });
     this.confirmDialog().nativeElement.showModal();
   }
 

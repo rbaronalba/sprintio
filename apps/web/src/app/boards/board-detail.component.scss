@@ -465,6 +465,28 @@ main {
 .members {
   display: flex;
   gap: var(--space-xxxs);
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.member-list {
+  list-style: none;
+  margin: var(--space-xs) 0 0;
+  padding: 0;
+}
+
+.member-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  padding: var(--space-xxs) 0;
+}
+
+.member-note {
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .avatar {

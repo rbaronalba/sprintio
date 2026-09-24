@@ -24,8 +24,6 @@ model User {
   displayName           String?
   passwordHash          String
   role                  Role          @default(DEVELOPER)
-  refreshTokenHash      String?
-  refreshTokenExpiresAt DateTime?
   createdAt             DateTime      @default(now())
   updatedAt             DateTime      @updatedAt
   boards                Board[]
@@ -36,6 +34,24 @@ model User {
   attachments           Attachment[]
   events                Event[]
   notifications         Notification[]
+  sessions              Session[]
+}
+
+/// One row per signed-in device. The refresh cookie names its row (`sid`) and must match
+/// its current hash; see ADR 0005.
+model Session {
+  id            String    @id @default(cuid())
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        String
+  tokenHash     String
+  /// The hash just rotated out, honoured for a few seconds so two tabs refreshing at
+  /// once do not look like a replayed token.
+  prevTokenHash String?
+  rotatedAt     DateTime?
+  expiresAt     DateTime
+  createdAt     DateTime  @default(now())
+
+  @@index([userId])
 }
 
 model Board {

@@ -68,6 +68,10 @@ export function describeEvent(event: ActivityLike): string {
       return `deleted the list ${list}`;
     case 'MEMBER_JOINED':
       return `joined ${str(d, 'boardTitle')}`;
+    case 'MEMBER_REMOVED':
+      return d['left']
+        ? `left ${str(d, 'boardTitle')}`
+        : `removed ${str(d, 'email')} from ${str(d, 'boardTitle')}`;
     default:
       // A new server event type should read as something, not vanish.
       return event.type.toLowerCase().replace(/_/g, ' ');

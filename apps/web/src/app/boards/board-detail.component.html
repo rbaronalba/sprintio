@@ -5,11 +5,11 @@
   </a>
   <a routerLink="/dashboard" class="back">&larr; Boards</a>
   <h1 class="board-title">{{ board()?.title }}</h1>
-  <div class="members" aria-label="Board members">
+  <button type="button" class="members" aria-label="Board members" (click)="membersDialog.showModal()">
     @for (m of members(); track m.userId) {
       <span class="avatar" [title]="m.email">{{ initial(m.email) }}</span>
     }
-  </div>
+  </button>
   @if (isOwner()) {
     <button type="button" class="btn btn-outline share" (click)="openShare()">Share</button>
   }
@@ -403,12 +403,16 @@
 
 <dialog #confirmDialog class="card-dialog confirm-dialog">
   <p>
-    Are you sure you want to delete
-    <strong>{{ pendingDelete()?.name }}</strong>? {{ pendingDelete()?.note }}
-    This can't be undone.
+    Are you sure you want to {{ pendingDelete()?.verb ?? 'delete' }}
+    <strong>{{ pendingDelete()?.name }}</strong>? {{ pendingDelete()?.note ?? '' }}
+    @if (!pendingDelete()?.verb) {
+      This can't be undone.
+    }
   </p>
   <div class="dialog-actions">
-    <button type="button" class="btn btn-primary" (click)="confirmDelete()">Delete</button>
+    <button type="button" class="btn btn-primary" (click)="confirmDelete()">
+      {{ pendingDelete()?.verb ?? 'delete' | titlecase }}
+    </button>
     <button type="button" class="btn btn-outline" (click)="confirmDialog.close()">Cancel</button>
   </div>
 </dialog>
@@ -431,6 +435,29 @@
     </ul>
   }
 </div>
+
+<dialog #membersDialog class="card-dialog share-dialog">
+  <p class="label-caps">Board members</p>
+  <ul class="member-list">
+    @for (m of members(); track m.userId) {
+      <li class="member-line">
+        <span class="avatar">{{ initial(m.email) }}</span>
+        <span class="member-email">{{ m.email }}</span>
+        @if (m.userId === board()?.ownerId) {
+          <span class="member-note">Owner</span>
+        } @else if (isOwner()) {
+          <button type="button" class="icon-btn" (click)="askRemoveMember(m)">Remove</button>
+        }
+      </li>
+    }
+  </ul>
+  <div class="dialog-actions">
+    @if (!isOwner()) {
+      <button type="button" class="btn btn-outline" (click)="askLeave()">Leave board</button>
+    }
+    <button type="button" class="icon-btn danger" (click)="membersDialog.close()">Close</button>
+  </div>
+</dialog>
 
 <dialog #shareDialog class="card-dialog share-dialog">
   <p class="label-caps">Share this board</p>

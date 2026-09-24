@@ -40,6 +40,16 @@ ok('unassign works',(await call('DELETE',`/cards/${card.id}/members/${Bo.id}`,Bo
 ok('revoke invite (owner)',(await call('DELETE',`/boards/${board.id}/invite`,A.t)).s===200);
 ok('revoked token dead',(await call('GET',`/boards/join/${inv.token}`,C.t)).s===404);
 ok('existing member keeps access after revoke',(await call('GET',`/boards/${board.id}`,Bo.t)).s===200);
+const inv2=(await call('POST',`/boards/${board.id}/invite`,A.t)).j;
+await call('POST',`/boards/join/${inv2.token}`,C.t);
+await call('PUT',`/cards/${card.id}/members/${Bo.id}`,Bo.t);
+ok('member cannot remove another member',(await call('DELETE',`/boards/${board.id}/members/${C.id}`,Bo.t)).s===403);
+ok('owner cannot be removed',(await call('DELETE',`/boards/${board.id}/members/${A.id}`,Bo.t)).s===400);
+ok('owner removes a member',(await call('DELETE',`/boards/${board.id}/members/${Bo.id}`,A.t)).s===200);
+ok('removed member loses access',(await call('GET',`/boards/${board.id}`,Bo.t)).s===404);
+ok('removed member is unassigned',(await call('GET',`/boards/${board.id}/lists`,A.t)).j[0].cards.find(c=>c.id===card.id).assignees.every(a=>a.userId!==Bo.id));
+ok('member leaves',(await call('DELETE',`/boards/${board.id}/members/${C.id}`,C.t)).s===200);
+ok('left member loses access',(await call('GET',`/boards/${board.id}`,C.t)).s===404);
 ok('owner deletes board',(await call('DELETE',`/boards/${board.id}`,A.t)).s===200);
 ok('member loses board after delete',(await call('GET',`/boards/${board.id}`,Bo.t)).s===404);
 console.log('stamp',stamp);

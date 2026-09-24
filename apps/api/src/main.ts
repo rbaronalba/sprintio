@@ -12,6 +12,8 @@ async function bootstrap() {
   // One trusted hop (nginx): the throttler must key on the real client IP, not the proxy's.
   // The api port is bound to localhost in docker-compose, so clients cannot spoof X-Forwarded-For.
   app.set('trust proxy', 1);
+  // No reason to advertise the framework to anyone fingerprinting the API.
+  app.disable('x-powered-by');
   app.use(cookieParser());
   app.enableCors({ origin: process.env.WEB_ORIGIN, credentials: true });
   // Attachment filenames are random (see uploads.ts): knowing the URL is what grants access, same as invite links.

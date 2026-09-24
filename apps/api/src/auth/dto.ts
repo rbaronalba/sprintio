@@ -9,11 +9,13 @@ export interface Credentials {
 
 export function parseCredentials(body: unknown): Credentials {
   const { email, password } = (body ?? {}) as Record<string, unknown>;
-  if (typeof email !== 'string' || !EMAIL_RE.test(email)) {
+  // 254 is the longest address SMTP can deliver to.
+  if (typeof email !== 'string' || email.length > 254 || !EMAIL_RE.test(email)) {
     throw new BadRequestException('Invalid email');
   }
-  if (typeof password !== 'string' || password.length < 8) {
-    throw new BadRequestException('Password must be at least 8 characters');
+  // The cap keeps a megabyte "password" from buying a free scrypt run.
+  if (typeof password !== 'string' || password.length < 8 || password.length > 128) {
+    throw new BadRequestException('Password must be 8 to 128 characters');
   }
   return { email: email.toLowerCase(), password };
 }

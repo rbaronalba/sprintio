@@ -82,11 +82,16 @@ export class BoardsService {
   }
 
   previewInvite(token: string): Observable<InvitePreview> {
-    return this.http.get<InvitePreview>(`/boards/join/${token}`);
+    return this.http.get<InvitePreview>(`/boards/join/${encodeURIComponent(token)}`);
   }
 
   join(token: string): Observable<{ boardId: string }> {
-    return this.http.post<{ boardId: string }>(`/boards/join/${token}`, {});
+    return this.http.post<{ boardId: string }>(`/boards/join/${encodeURIComponent(token)}`, {});
+  }
+
+  /** Owner removing someone, or anyone passing their own id to leave. */
+  removeMember(boardId: string, userId: string): Observable<unknown> {
+    return this.http.delete(`/boards/${boardId}/members/${userId}`);
   }
 
   search(term: string): Observable<SearchHit[]> {

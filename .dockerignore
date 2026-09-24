@@ -3,7 +3,9 @@
 **/.angular
 **/coverage
 **/.env
-**/.env.local
+**/.env.*
+**/*.pem
+**/*.key
 .git
 .claude
 .vscode

@@ -14,7 +14,7 @@ import { Throttle } from '@nestjs/throttler';
 import { Observable, finalize, interval, map, merge } from 'rxjs';
 import { EventsService } from './events.service.js';
 import { NotificationsService } from './notifications.service.js';
-import { STREAM_AUDIENCE, type JwtPayload } from '../auth/auth.service.js';
+import { JWT_ALGORITHM, STREAM_AUDIENCE, type JwtPayload } from '../auth/auth.service.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
 
@@ -83,6 +83,7 @@ export class EventsController {
     try {
       const payload = await this.jwt.verifyAsync<{ sub: string }>(ticket, {
         audience: STREAM_AUDIENCE,
+        algorithms: [JWT_ALGORITHM],
       });
       return payload.sub;
     } catch {

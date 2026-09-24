@@ -21,7 +21,8 @@ owner-only operations go through `findOwned()`.
 
 Authorization is board-scoped and has exactly two levels:
 
-- **Owner** — rename, delete, and share the board (create and revoke the invite link).
+- **Owner** — rename, delete, and share the board (create and revoke the invite link),
+  and remove members.
 - **Member** — everything else: lists, cards, labels, comments, time, attachments,
   checklists. The owner is stored as a member too, so member checks cover them.
 
@@ -36,6 +37,9 @@ and nothing reads it for an access decision.
 
 - No permission matrix to maintain, and no way to grant board access by editing a user
   row — access is a `BoardMember` row and nothing else.
+- Any member can leave a board; the owner cannot (they delete it instead). Leaving or
+  being removed also drops your card assignments, and the open SSE stream stops
+  delivering that board.
 - Any member can delete any card. That is Trello's behaviour; it is a trust model, not
   an oversight.
 - There is no board-admin tier and no "observer" (read-only) tier. If either is needed,

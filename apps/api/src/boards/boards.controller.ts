@@ -43,6 +43,16 @@ export class BoardsController {
     return this.boards.revokeInvite(user.sub, id);
   }
 
+  // Owner: remove a member. Anyone: pass their own id to leave.
+  @Delete(':id/members/:userId')
+  removeMember(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+  ) {
+    return this.boards.removeMember(user.sub, id, userId);
+  }
+
   @Get(':id/activity')
   listActivity(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.boards.listActivity(user.sub, id);

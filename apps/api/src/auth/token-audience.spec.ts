@@ -33,6 +33,13 @@ describe('token audiences', () => {
     );
   });
 
+  it('rejects a token signed with any algorithm but HS256', async () => {
+    const token = await jwt.signAsync({ sub: 'u1' }, { audience: ACCESS_AUDIENCE, algorithm: 'HS512' });
+    await expect(new JwtAuthGuard(jwt).canActivate(contextWith(token))).rejects.toThrow(
+      UnauthorizedException,
+    );
+  });
+
   it('rejects a token minted with no audience at all', async () => {
     const token = await jwt.signAsync({ sub: 'u1' });
     await expect(new JwtAuthGuard(jwt).canActivate(contextWith(token))).rejects.toThrow(

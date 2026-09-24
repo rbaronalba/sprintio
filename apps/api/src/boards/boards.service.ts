@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { memberOf } from './access.js';
 import { EventsService } from '../events/events.service.js';
@@ -85,6 +85,32 @@ export class BoardsService {
   async revokeInvite(ownerId: string, id: string) {
     await this.findOwned(ownerId, id);
     await this.prisma.board.update({ where: { id }, data: { inviteToken: null } });
+  }
+
+  /**
+   * The owner removes anyone else; anyone else can only remove themselves (leave).
+   * Their card assignments go with them, so no card shows an assignee who cannot see it.
+   */
+  async removeMember(actorId: string, boardId: string, targetId: string) {
+    const board = await this.prisma.board.findFirst({ where: { id: boardId, ...memberOf(actorId) } });
+    if (!board) throw new NotFoundException('Board not found');
+    if (targetId === board.ownerId) throw new BadRequestException('The owner cannot leave their board');
+    if (actorId !== board.ownerId && actorId !== targetId) {
+      throw new ForbiddenException('Only the owner can remove other members');
+    }
+    const target = await this.prisma.user.findUnique({ where: { id: targetId }, select: { email: true } });
+    const [, removed] = await this.prisma.$transaction([
+      this.prisma.cardMember.deleteMany({ where: { userId: targetId, card: { list: { boardId } } } }),
+      this.prisma.boardMember.deleteMany({ where: { boardId, userId: targetId } }),
+    ]);
+    if (removed.count === 0) return;
+    // EventsService narrows the target's open stream on exactly this event.
+    await this.events.record({
+      type: 'MEMBER_REMOVED',
+      boardId,
+      actorId,
+      data: { boardTitle: board.title, userId: targetId, email: target?.email, left: actorId === targetId },
+    });
   }
 
   private async assertMember(userId: string, boardId: string) {
