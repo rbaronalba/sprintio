@@ -58,5 +58,6 @@ test('logging in with a wrong password shows an error and stays on the login pag
 
 test('the dashboard is not reachable without a session', async ({ page }) => {
   await page.goto('/dashboard');
-  await expect(page).toHaveURL(/\/login$/);
+  // The guard keeps returnUrl on the query string so the login lands you back here.
+  await expect(page).toHaveURL(/\/login\?returnUrl=%2Fdashboard$/);
 });

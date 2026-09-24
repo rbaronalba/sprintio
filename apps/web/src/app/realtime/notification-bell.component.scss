@@ -1,0 +1,116 @@
+:host {
+  display: contents;
+}
+
+.bell-trigger {
+  background: none;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  padding: var(--space-xxs) var(--space-xs);
+
+  &:hover {
+    border-color: var(--muted);
+  }
+}
+
+/* Plain parenthesised count, not a coloured pill: this project uses no badges. */
+.unread-count {
+  color: var(--primary);
+  margin-left: var(--space-xxxs);
+}
+
+.bell-panel {
+  background: var(--canvas-elevated);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  color: var(--ink);
+  inset: auto;
+  margin: 0;
+  max-height: min(420px, 70vh);
+  overflow-y: auto;
+  padding: 0;
+  position: fixed;
+  right: var(--space-xs);
+  top: 56px;
+  width: min(360px, calc(100vw - 2 * var(--space-xs)));
+
+  &:popover-open {
+    display: block;
+  }
+}
+
+.bell-head {
+  align-items: center;
+  background: var(--canvas-elevated);
+  border-bottom: 1px solid var(--hairline);
+  display: flex;
+  justify-content: space-between;
+  padding: var(--space-xs);
+  position: sticky;
+  top: 0;
+
+  p {
+    margin: 0;
+  }
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--primary);
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+}
+
+.bell-empty {
+  color: var(--muted);
+  margin: 0;
+  padding: var(--space-xs);
+}
+
+.bell-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+
+  li + li {
+    border-top: 1px solid var(--hairline);
+  }
+
+  /* Unread is marked with a left rule, not a dot or pill. */
+  li.is-unread .bell-item {
+    border-left: 2px solid var(--primary);
+  }
+}
+
+.bell-item {
+  background: none;
+  border: none;
+  border-left: 2px solid transparent;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  font: inherit;
+  gap: var(--space-xxxs);
+  padding: var(--space-xs);
+  text-align: left;
+  width: 100%;
+
+  &:hover {
+    background: var(--surface-card);
+  }
+}
+
+.bell-text {
+  overflow-wrap: anywhere;
+}
+
+.bell-time {
+  color: var(--muted);
+  font-size: 12px;
+}

@@ -1,13 +1,16 @@
 import { ChangeDetectionStrategy, Component, ElementRef, inject, signal, viewChild } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Subject, debounceTime, distinctUntilChanged, switchMap } from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '../auth/auth.service';
 import { ThemeToggleComponent } from '../theme-toggle/theme-toggle.component';
-import { Board, BoardsService } from '../boards/boards.service';
+import { NotificationBellComponent } from '../realtime/notification-bell.component';
+import { Board, BoardsService, SearchHit } from '../boards/boards.service';
 
 @Component({
   selector: 'app-dashboard',
-  imports: [ThemeToggleComponent, ReactiveFormsModule, RouterLink],
+  imports: [ThemeToggleComponent, ReactiveFormsModule, RouterLink, NotificationBellComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss',
@@ -22,6 +25,11 @@ export class DashboardComponent {
   readonly creating = signal(false);
   readonly pendingDelete = signal<Board | null>(null);
   private readonly confirmDialog = viewChild.required<ElementRef<HTMLDialogElement>>('confirmDialog');
+  private readonly profileDialog = viewChild.required<ElementRef<HTMLDialogElement>>('profileDialog');
+
+  readonly searchTerm = signal('');
+  readonly searchHits = signal<SearchHit[]>([]);
+  private readonly searchInput = new Subject<string>();
 
   readonly form = inject(FormBuilder).nonNullable.group({
     title: ['', [Validators.required, Validators.maxLength(100)]],
@@ -29,6 +37,43 @@ export class DashboardComponent {
 
   constructor() {
     this.boardsApi.list().subscribe((boards) => this.boards.set(boards));
+
+    this.searchInput
+      .pipe(
+        debounceTime(250),
+        distinctUntilChanged(),
+        // switchMap, not mergeMap: a slow response for "ca" must never overwrite
+        // the results for "card" the user has already typed.
+        switchMap((term) => this.boardsApi.search(term)),
+        takeUntilDestroyed(),
+      )
+      .subscribe((hits) => this.searchHits.set(hits));
+  }
+
+  search(term: string): void {
+    this.searchTerm.set(term);
+    this.searchInput.next(term.trim());
+  }
+
+  clearSearch(): void {
+    this.searchTerm.set('');
+    this.searchHits.set([]);
+    this.searchInput.next('');
+  }
+
+  openHit(hit: SearchHit): void {
+    this.clearSearch();
+    void this.router.navigate(['/boards', hit.boardId], { queryParams: { card: hit.cardId } });
+  }
+
+  openProfile(): void {
+    this.profileDialog().nativeElement.showModal();
+  }
+
+  saveProfile(displayName: string): void {
+    this.auth.updateProfile(displayName.trim() || null).subscribe(() => {
+      this.profileDialog().nativeElement.close();
+    });
   }
 
   createBoard(): void {

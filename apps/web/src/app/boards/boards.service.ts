@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, of } from 'rxjs';
 
 export interface Board {
   id: string;
@@ -15,18 +15,42 @@ export interface Member {
   email: string;
 }
 
+export interface Label {
+  id: string;
+  name: string;
+  color: string;
+}
+
 export interface BoardDetail {
   id: string;
   title: string;
   ownerId: string;
   inviteToken: string | null;
   members: Member[];
+  labels: Label[];
 }
 
 export interface InvitePreview {
   boardId: string;
   title: string;
   isMember: boolean;
+}
+
+export interface SearchHit {
+  cardId: string;
+  title: string;
+  listTitle: string;
+  boardId: string;
+  boardTitle: string;
+}
+
+export interface ActivityEntry {
+  id: string;
+  type: string;
+  cardId: string | null;
+  actor: { email: string; displayName: string | null };
+  data: Record<string, unknown>;
+  createdAt: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -63,5 +87,23 @@ export class BoardsService {
 
   join(token: string): Observable<{ boardId: string }> {
     return this.http.post<{ boardId: string }>(`/boards/join/${token}`, {});
+  }
+
+  search(term: string): Observable<SearchHit[]> {
+    // The API needs two characters to match; skip the round trip below that.
+    if (term.trim().length < 2) return of([]);
+    return this.http.get<SearchHit[]>('/search', { params: { q: term.trim() } });
+  }
+
+  listActivity(boardId: string): Observable<ActivityEntry[]> {
+    return this.http.get<ActivityEntry[]>(`/boards/${boardId}/activity`);
+  }
+
+  createLabel(boardId: string, name: string, color: string): Observable<Label> {
+    return this.http.post<Label>(`/boards/${boardId}/labels`, { name, color });
+  }
+
+  removeLabel(boardId: string, labelId: string): Observable<unknown> {
+    return this.http.delete(`/boards/${boardId}/labels/${labelId}`);
   }
 }

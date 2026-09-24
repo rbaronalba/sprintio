@@ -1,0 +1,39 @@
+<button
+  type="button"
+  class="bell-trigger"
+  (click)="toggle()"
+  [attr.aria-label]="
+    store.unread() > 0 ? 'Activity, ' + store.unread() + ' unread' : 'Activity'
+  "
+>
+  Activity
+  @if (store.unread() > 0) {
+    <span class="unread-count" aria-hidden="true">({{ store.unread() }})</span>
+  }
+</button>
+
+<div #panel popover class="bell-panel" role="region" aria-label="Recent activity">
+  <div class="bell-head">
+    <p class="label-caps">Activity</p>
+    @if (store.unread() > 0) {
+      <button type="button" class="link-btn" (click)="store.markAllRead()">Mark all read</button>
+    }
+  </div>
+
+  @if (store.items().length === 0) {
+    <p class="bell-empty">Nothing yet.</p>
+  } @else {
+    <ul class="bell-list">
+      @for (item of store.items(); track item.id) {
+        <li [class.is-unread]="!item.readAt">
+          <button type="button" class="bell-item" (click)="open(item)">
+            <span class="bell-text">
+              <strong>{{ actorName(item.actor) }}</strong> {{ describe(item) }}
+            </span>
+            <span class="bell-time">{{ relativeTime(item.createdAt) }}</span>
+          </button>
+        </li>
+      }
+    </ul>
+  }
+</div>

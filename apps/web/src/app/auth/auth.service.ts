@@ -8,6 +8,7 @@ export interface AuthUser {
   sub: string;
   email: string;
   role: Role;
+  displayName: string | null;
 }
 
 interface AuthResponse {
@@ -69,6 +70,12 @@ export class AuthService {
       map(() => true),
       catchError(() => of(false)),
     );
+  }
+
+  updateProfile(displayName: string | null): Observable<AuthUser> {
+    return this.http
+      .patch<AuthUser>('/auth/profile', { displayName })
+      .pipe(tap((user) => this.currentUserSignal.set(user)));
   }
 
   clearSession(): void {

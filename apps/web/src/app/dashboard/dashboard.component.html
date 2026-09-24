@@ -9,7 +9,32 @@
     <a href="#" class="nav-link">Team</a>
   </nav>
   <div class="nav-utils">
+    <div class="search">
+      <input
+        type="search"
+        class="search-input"
+        placeholder="Search cards…"
+        aria-label="Search cards across all boards"
+        [value]="searchTerm()"
+        (input)="search($any($event.target).value)"
+        (keydown.escape)="clearSearch()"
+      />
+      @if (searchHits().length > 0) {
+        <ul class="search-results" role="listbox" aria-label="Search results">
+          @for (hit of searchHits(); track hit.cardId) {
+            <li>
+              <button type="button" (click)="openHit(hit)">
+                <span class="hit-title">{{ hit.title }}</span>
+                <span class="hit-where">{{ hit.boardTitle }} · {{ hit.listTitle }}</span>
+              </button>
+            </li>
+          }
+        </ul>
+      }
+    </div>
+    <app-notification-bell />
     <app-theme-toggle />
+    <button type="button" class="btn btn-outline" (click)="openProfile()">Profile</button>
     <button type="button" class="btn btn-outline" (click)="logout()">Log out</button>
   </div>
 </header>
@@ -20,7 +45,7 @@
     <h1>Paddock.</h1>
     @if (auth.currentUser(); as user) {
       <p class="signed-in">
-        Signed in as <strong data-testid="current-user">{{ user.email }}</strong>
+        Signed in as <strong data-testid="current-user">{{ user.displayName || user.email }}</strong>
         <span class="role">{{ user.role }}</span>
       </p>
     }
@@ -87,6 +112,24 @@
     </div>
   </section>
 </main>
+
+<dialog #profileDialog class="confirm-dialog">
+  <p class="label-caps">Profile</p>
+  <p class="profile-email">{{ auth.currentUser()?.email }}</p>
+  <label class="label-caps" for="display-name">Display name</label>
+  <input
+    #nameField
+    id="display-name"
+    type="text"
+    maxlength="60"
+    placeholder="Shown instead of your email"
+    [value]="auth.currentUser()?.displayName ?? ''"
+  />
+  <div class="dialog-actions">
+    <button type="button" class="btn btn-primary" (click)="saveProfile(nameField.value)">Save</button>
+    <button type="button" class="btn btn-outline" (click)="profileDialog.close()">Cancel</button>
+  </div>
+</dialog>
 
 <dialog #confirmDialog class="confirm-dialog">
   <p>

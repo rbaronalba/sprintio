@@ -34,3 +34,40 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter web run build
       - run: pnpm --filter web exec ng test --watch=false --browsers=ChromeHeadless
+
+  # Browser tests against the real stack: the only job that proves the SSE stream,
+  # nginx's proxy_buffering and the drag-and-drop persistence actually work together.
+  e2e:
+    runs-on: ubuntu-latest
+    env:
+      POSTGRES_PASSWORD: cipassword
+      JWT_SECRET: ci-jwt-secret-not-used-anywhere-else
+      # The suite signs up a dozen accounts from one IP in seconds, which is precisely
+      # what the production default of 10/min exists to block. See apps/api auth.controller.
+      AUTH_RATE_LIMIT: 500
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: docker compose up -d --build
+      - name: Apply migrations
+        run: pnpm --filter api exec prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://sprintio:cipassword@localhost:5432/sprintio?schema=public
+      - name: Wait for the web app
+        run: timeout 120 bash -c 'until curl -sf http://localhost:4200 > /dev/null; do sleep 2; done'
+      - run: pnpm --filter web exec playwright install --with-deps chromium
+      - run: pnpm --filter web run e2e
+      - name: API smoke tests
+        run: for f in apps/api/test/*.smoke.mjs; do node "$f" || exit 1; done
+      - if: failure()
+        run: docker compose logs --tail 200
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/web/test-results

@@ -14,5 +14,21 @@
   "/cards": {
     "target": "http://localhost:3001",
     "secure": false
+  },
+  "/uploads": {
+    "target": "http://localhost:3001",
+    "secure": false
+  },
+  "/search": {
+    "target": "http://localhost:3001",
+    "secure": false
+  },
+  "/notifications": {
+    "target": "http://localhost:3001",
+    "secure": false
+  },
+  "/events": {
+    "target": "http://localhost:3001",
+    "secure": false
   }
 }

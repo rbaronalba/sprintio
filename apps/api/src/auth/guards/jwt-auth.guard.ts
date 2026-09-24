@@ -1,6 +1,6 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import type { JwtPayload } from '../auth.service.js';
+import { ACCESS_AUDIENCE, type JwtPayload } from '../auth.service.js';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -13,7 +13,9 @@ export class JwtAuthGuard implements CanActivate {
     if (!token) throw new UnauthorizedException('Missing access token');
 
     try {
-      request.user = await this.jwt.verifyAsync<JwtPayload>(token);
+      // The audience check is what stops a refresh cookie or an SSE ticket being
+      // replayed here as an access token.
+      request.user = await this.jwt.verifyAsync<JwtPayload>(token, { audience: ACCESS_AUDIENCE });
       return true;
     } catch {
       throw new UnauthorizedException('Invalid or expired access token');

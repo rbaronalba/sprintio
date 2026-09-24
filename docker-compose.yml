@@ -25,8 +25,13 @@ services:
       PORT: 3001
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in your environment or a .env file}
       WEB_ORIGIN: http://localhost:4200
+      # Registrations+logins per minute per IP. Defaults to the production value; raise
+      # it only to run the e2e suite, which signs up a dozen accounts from one address.
+      AUTH_RATE_LIMIT: ${AUTH_RATE_LIMIT:-10}
     ports:
       - '127.0.0.1:3001:3001'
+    volumes:
+      - uploads-data:/app/uploads
     depends_on:
       db:
         condition: service_healthy
@@ -42,3 +47,4 @@ services:
 
 volumes:
   db-data:
+  uploads-data:

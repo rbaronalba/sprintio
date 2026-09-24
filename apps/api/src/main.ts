@@ -2,6 +2,7 @@ import cookieParser from 'cookie-parser';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module.js';
+import { UPLOAD_DIR } from './cards/uploads.js';
 
 async function bootstrap() {
   // Without an explicit origin cors falls back to '*', which silently defeats credentialed CORS.
@@ -13,6 +14,8 @@ async function bootstrap() {
   app.set('trust proxy', 1);
   app.use(cookieParser());
   app.enableCors({ origin: process.env.WEB_ORIGIN, credentials: true });
+  // Attachment filenames are random (see uploads.ts): knowing the URL is what grants access, same as invite links.
+  app.useStaticAssets(UPLOAD_DIR, { prefix: '/uploads/' });
   await app.listen(process.env.PORT ?? 3000);
 }
 await bootstrap();

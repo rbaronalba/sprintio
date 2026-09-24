@@ -1,7 +1,7 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { BoardsService } from './boards.service.js';
-import { parseTitle } from './dto.js';
+import { parseTitle, parseUpsertLabel } from './dto.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
 import type { JwtPayload } from '../auth/auth.service.js';
@@ -43,6 +43,30 @@ export class BoardsController {
     return this.boards.revokeInvite(user.sub, id);
   }
 
+  @Get(':id/activity')
+  listActivity(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.boards.listActivity(user.sub, id);
+  }
+
+  @Get(':id/labels')
+  listLabels(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.boards.listLabels(user.sub, id);
+  }
+
+  @Post(':id/labels')
+  createLabel(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() body: unknown) {
+    return this.boards.createLabel(user.sub, id, parseUpsertLabel(body));
+  }
+
+  @Delete(':id/labels/:labelId')
+  removeLabel(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Param('labelId') labelId: string,
+  ) {
+    return this.boards.removeLabel(user.sub, id, labelId);
+  }
+
   @Post()
   create(@CurrentUser() user: JwtPayload, @Body() body: unknown) {
     return this.boards.create(user.sub, parseTitle(body));
@@ -56,5 +80,17 @@ export class BoardsController {
   @Delete(':id')
   remove(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.boards.remove(user.sub, id);
+  }
+}
+
+// Its own path rather than /boards/search, which would collide with GET /boards/:id.
+@UseGuards(JwtAuthGuard)
+@Controller('search')
+export class SearchController {
+  constructor(private readonly boards: BoardsService) {}
+
+  @Get()
+  search(@CurrentUser() user: JwtPayload, @Query('q') q: string) {
+    return this.boards.search(user.sub, q ?? '');
   }
 }

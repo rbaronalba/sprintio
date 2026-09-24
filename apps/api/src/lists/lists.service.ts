@@ -1,13 +1,18 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { memberOf } from '../boards/access.js';
+import { EventsService } from '../events/events.service.js';
+import { CARD_FACE_INCLUDE } from '../cards/card-include.js';
 import type { UpsertListInput } from './dto.js';
 
 const MAX_LISTS_PER_BOARD = 30;
 
 @Injectable()
 export class ListsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly events: EventsService,
+  ) {}
 
   private async assertBoardAccess(userId: string, boardId: string) {
     const board = await this.prisma.board.findFirst({ where: { id: boardId, ...memberOf(userId) } });
@@ -19,7 +24,9 @@ export class ListsService {
     return this.prisma.list.findMany({
       where: { boardId },
       orderBy: { position: 'asc' },
-      include: { cards: { orderBy: { position: 'asc' }, include: { assignees: true } } },
+      include: {
+        cards: { orderBy: { position: 'asc' }, include: CARD_FACE_INCLUDE },
+      },
     });
   }
 
@@ -32,9 +39,16 @@ export class ListsService {
       where: { boardId },
       orderBy: { position: 'desc' },
     });
-    return this.prisma.list.create({
+    const list = await this.prisma.list.create({
       data: { title, boardId, position: (last?.position ?? 0) + 1000 },
     });
+    await this.events.record({
+      type: 'LIST_CREATED',
+      boardId,
+      actorId: userId,
+      data: { listTitle: list.title },
+    });
+    return list;
   }
 
   async findAccessible(userId: string, id: string) {
@@ -46,12 +60,28 @@ export class ListsService {
   }
 
   async update(userId: string, id: string, input: UpsertListInput) {
-    await this.findAccessible(userId, id);
-    return this.prisma.list.update({ where: { id }, data: input });
+    const list = await this.findAccessible(userId, id);
+    const updated = await this.prisma.list.update({ where: { id }, data: input });
+    // Reordering lists is not feed-worthy; renaming them is.
+    if (input.title !== undefined && input.title !== list.title) {
+      await this.events.record({
+        type: 'LIST_UPDATED',
+        boardId: list.boardId,
+        actorId: userId,
+        data: { from: list.title, listTitle: updated.title },
+      });
+    }
+    return updated;
   }
 
   async remove(userId: string, id: string) {
-    await this.findAccessible(userId, id);
+    const list = await this.findAccessible(userId, id);
     await this.prisma.list.delete({ where: { id } });
+    await this.events.record({
+      type: 'LIST_DELETED',
+      boardId: list.boardId,
+      actorId: userId,
+      data: { listTitle: list.title },
+    });
   }
 }

@@ -14,9 +14,50 @@
     <button type="button" class="btn btn-outline share" (click)="openShare()">Share</button>
   }
   <div class="nav-utils">
+    @if (!live()) {
+      <span class="offline" title="Reconnecting to live updates">Offline</span>
+    }
+    <app-notification-bell />
     <app-theme-toggle />
   </div>
 </header>
+
+<div class="filter-bar">
+  <input
+    type="search"
+    placeholder="Filter cards by title"
+    [value]="filterText()"
+    (input)="setFilterText($any($event.target).value)"
+  />
+  <div class="filter-group">
+    @for (l of labels(); track l.id) {
+      <button
+        type="button"
+        class="filter-swatch"
+        [class.on]="filterLabelIds().has(l.id)"
+        [style.background]="l.color"
+        [title]="l.name || 'Unnamed label'"
+        (click)="toggleFilterLabel(l.id)"
+      ></button>
+    }
+  </div>
+  <div class="filter-group">
+    @for (m of members(); track m.userId) {
+      <button
+        type="button"
+        class="avatar filter-avatar"
+        [class.on]="filterMemberIds().has(m.userId)"
+        [title]="m.email"
+        (click)="toggleFilterMember(m.userId)"
+      >
+        {{ initial(m.email) }}
+      </button>
+    }
+  </div>
+  @if (filterActive()) {
+    <button type="button" class="btn btn-outline filter-clear" (click)="clearFilters()">Clear filter</button>
+  }
+</div>
 
 <main>
   <div
@@ -61,6 +102,7 @@
           @for (card of list.cards; track card.id) {
             <div
               class="card"
+              [class.filtered-out]="filterActive() && !cardMatchesFilter(card)"
               cdkDrag
               tabindex="0"
               (cdkDragStarted)="onDragStart()"
@@ -68,7 +110,40 @@
               (click)="openCard(card)"
               (keydown.enter)="openCard(card)"
             >
-              <span class="card-title">{{ card.title }}</span>
+              <div class="card-body">
+                @if (card.labels.length) {
+                  <span class="label-row">
+                    @for (l of labels(); track l.id) {
+                      @if (isLabelOn(card, l)) {
+                        <span class="label-swatch" [style.background]="l.color" [title]="l.name"></span>
+                      }
+                    }
+                  </span>
+                }
+                <span class="card-title">{{ card.title }}</span>
+                <span class="card-meta">
+                  @if (card.dueDate) {
+                    <span class="due" [class.overdue]="isOverdue(card)" [class.due-done]="card.dueDone">
+                      @if (card.dueDone) {
+                        <span aria-hidden="true">&#10003;</span>
+                      }
+                      {{ formatDueDate(card.dueDate) }}
+                    </span>
+                  }
+                  @if (totalHours(card)) {
+                    <span>&#9201; {{ totalHours(card) }}h</span>
+                  }
+                  @if (card.checklist.length) {
+                    <span>&#9745; {{ checklistDone(card) }}/{{ card.checklist.length }}</span>
+                  }
+                  @if (card._count.comments) {
+                    <span>&#128172; {{ card._count.comments }}</span>
+                  }
+                  @if (card._count.attachments) {
+                    <span>&#128206; {{ card._count.attachments }}</span>
+                  }
+                </span>
+              </div>
               <span class="card-tools">
                 @for (a of card.assignees; track a.userId) {
                   <span class="avatar" [title]="emailOf(a.userId)">{{ initial(emailOf(a.userId)) }}</span>
@@ -142,24 +217,185 @@
   </div>
 </main>
 
-<dialog #cardDialog class="card-dialog">
+<dialog #cardDialog class="card-dialog card-dialog-wide" (close)="onCardDialogClose()">
   @if (editing(); as card) {
-    <form (submit)="$event.preventDefault(); saveCard(titleField.value, descField.value)">
-      <label class="label-caps" for="card-title">Title</label>
-      <input #titleField id="card-title" type="text" [value]="card.title" maxlength="200" />
-      <label class="label-caps" for="card-desc">Description</label>
-      <textarea
-        #descField
-        id="card-desc"
-        rows="6"
-        maxlength="5000"
-        placeholder="Add a more detailed description"
-        [value]="card.description ?? ''"
-      ></textarea>
-      <div class="dialog-actions">
-        <button type="submit" class="btn btn-primary">Save</button>
-        <button type="button" class="btn btn-outline" (click)="cardDialog.close()">Cancel</button>
-        <button type="button" class="icon-btn danger" (click)="askDeleteCard(card)">Delete card</button>
+    <form
+      class="card-dialog-grid"
+      (submit)="$event.preventDefault(); saveCard(titleField.value, descField.value, dueField.value)"
+    >
+      <div class="card-dialog-main">
+        <label class="label-caps" for="card-title">Title</label>
+        <input #titleField id="card-title" type="text" [value]="card.title" maxlength="200" />
+
+        <label class="label-caps">Labels</label>
+        <div class="label-list">
+          @for (l of labels(); track l.id) {
+            <div class="label-row-item" [class.off]="!isLabelOn(card, l)">
+              <button type="button" class="label-toggle" (click)="toggleLabel(card, l)">
+                <span class="label-swatch" [style.background]="l.color"></span>
+                <span>{{ l.name || 'Unnamed' }}</span>
+              </button>
+              <button type="button" class="icon-btn label-remove" aria-label="Delete label" (click)="removeBoardLabel(l)">&times;</button>
+            </div>
+          }
+        </div>
+        <div class="new-label">
+          @for (c of labelColors; track c) {
+            <button
+              type="button"
+              class="color-dot"
+              [class.picked]="pickedColor() === c"
+              [style.background]="c"
+              (click)="pickedColor.set(c)"
+              [attr.aria-label]="'Pick color ' + c"
+            ></button>
+          }
+          <input #labelNameInput type="text" placeholder="New label name" maxlength="40" />
+          <button type="button" class="btn btn-outline" (click)="addBoardLabel(pickedColor(), labelNameInput)">Add label</button>
+        </div>
+
+        <label class="label-caps" for="card-due">Due date</label>
+        <div class="due-row">
+          <input #dueField id="card-due" type="date" [value]="dateInputValue(card.dueDate)" />
+          @if (card.dueDate) {
+            <span class="due-check">
+              <input
+                type="checkbox"
+                id="card-due-done"
+                [checked]="card.dueDone"
+                (change)="toggleDueDone(card)"
+              />
+              <label for="card-due-done">Complete</label>
+            </span>
+          }
+        </div>
+
+        <label class="label-caps" for="card-desc">Description</label>
+        <textarea
+          #descField
+          id="card-desc"
+          rows="5"
+          maxlength="5000"
+          placeholder="Add a more detailed description"
+          [value]="card.description ?? ''"
+        ></textarea>
+
+        <label class="label-caps">
+          Checklist
+          @if (checklist().length) {
+            &mdash; {{ checklistDone(card) }}/{{ checklist().length }}
+          }
+        </label>
+        <ul class="checklist">
+          @for (i of checklist(); track i.id) {
+            <li class="checklist-item">
+              <input
+                type="checkbox"
+                [id]="'chk-' + i.id"
+                [checked]="i.done"
+                (change)="toggleChecklistItem(card, i)"
+              />
+              <label [for]="'chk-' + i.id" [class.done]="i.done">{{ i.text }}</label>
+              <button type="button" class="icon-btn" aria-label="Delete item" (click)="removeChecklistItem(card, i)">&times;</button>
+            </li>
+          }
+        </ul>
+        <div class="new-checklist">
+          <input
+            #itemInput
+            type="text"
+            placeholder="Add an item"
+            maxlength="200"
+            (keydown.enter)="$event.preventDefault(); addChecklistItem(card, itemInput)"
+          />
+          <button type="button" class="btn btn-outline" (click)="addChecklistItem(card, itemInput)">Add</button>
+        </div>
+
+        <label class="label-caps">Time tracking &mdash; {{ totalHours(card) }}h logged</label>
+        <ul class="time-list">
+          @for (e of timeEntries(); track e.id) {
+            <li class="time-row">
+              <span class="time-date">{{ formatEntryDate(e.date) }}</span>
+              <span class="time-hours">{{ e.hours }}h</span>
+              <span class="time-who">{{ e.user.email }}</span>
+              @if (e.note) {
+                <span class="time-note">{{ e.note }}</span>
+              }
+              @if (e.userId === currentUserId) {
+                <button type="button" class="icon-btn" aria-label="Delete time entry" (click)="removeTimeEntry(card, e)">&times;</button>
+              }
+            </li>
+          }
+        </ul>
+        <div class="new-time">
+          <input #timeDate type="date" aria-label="Date worked" />
+          <input #timeHours type="number" min="0.25" max="24" step="0.25" placeholder="Hours" aria-label="Hours" />
+          <input #timeNote type="text" placeholder="Note (optional)" maxlength="200" aria-label="Note" />
+          <button type="button" class="btn btn-outline" (click)="addTimeEntry(card, timeDate, timeHours, timeNote)">Log time</button>
+        </div>
+
+        <label class="label-caps">Attachments</label>
+        <div class="attachment-list">
+          @for (a of attachments(); track a.id) {
+            <div class="attachment">
+              <img [src]="attachmentUrl(a)" [alt]="a.originalName" />
+              <div class="attachment-meta">
+                <span class="attachment-name">{{ a.originalName }}</span>
+                @if (a.uploaderId === currentUserId) {
+                  <button type="button" class="icon-btn" aria-label="Delete attachment" (click)="removeAttachment(card, a)">&times;</button>
+                }
+              </div>
+            </div>
+          }
+        </div>
+        <input #fileInput type="file" accept="image/png,image/jpeg,image/gif,image/webp" (change)="uploadAttachment(card, fileInput)" />
+
+        <div class="dialog-actions">
+          <button type="submit" class="btn btn-primary">Save</button>
+          <button type="button" class="btn btn-outline" (click)="cardDialog.close()">Cancel</button>
+          <button type="button" class="icon-btn danger" (click)="askDeleteCard(card)">Delete card</button>
+        </div>
+      </div>
+
+      <div class="card-dialog-side">
+        <label class="label-caps">Comments</label>
+        <ul class="comment-list">
+          @for (c of comments(); track c.id) {
+            <li class="comment">
+              <span class="avatar">{{ initial(c.author.email) }}</span>
+              <div class="comment-body">
+                <p class="comment-meta">{{ c.author.email }}</p>
+                <p class="comment-text">{{ c.body }}</p>
+              </div>
+              @if (c.authorId === currentUserId) {
+                <button type="button" class="icon-btn" aria-label="Delete comment" (click)="removeComment(card, c)">&times;</button>
+              }
+            </li>
+          }
+        </ul>
+        <div class="new-comment">
+          <textarea
+            #commentField
+            rows="2"
+            maxlength="2000"
+            placeholder="Write a comment — @email to mention a member"
+          ></textarea>
+          <button type="button" class="btn btn-outline" (click)="addComment(card, commentField)">Comment</button>
+        </div>
+
+        <label class="label-caps activity-head">Activity</label>
+        <ul class="activity-list">
+          @for (a of activity(); track a.id) {
+            <li class="activity-row">
+              <span class="activity-text">
+                <strong>{{ actorName(a.actor) }}</strong> {{ describeEvent(a) }}
+              </span>
+              <span class="activity-time">{{ relativeTime(a.createdAt) }}</span>
+            </li>
+          } @empty {
+            <li class="activity-empty">No activity yet.</li>
+          }
+        </ul>
       </div>
     </form>
   }

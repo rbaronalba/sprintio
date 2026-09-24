@@ -2,13 +2,22 @@ import { randomBytes } from 'node:crypto';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { memberOf } from './access.js';
+import { EventsService } from '../events/events.service.js';
+import type { UpsertLabelInput } from './dto.js';
 
 const MAX_BOARDS_PER_USER = 100;
 const MAX_MEMBERS_PER_BOARD = 20;
+const MAX_LABELS_PER_BOARD = 20;
+const ACTIVITY_PAGE = 50;
+/** A search is a jump-to, not a report: more than this and you should be filtering a board. */
+const SEARCH_LIMIT = 25;
 
 @Injectable()
 export class BoardsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly events: EventsService,
+  ) {}
 
   list(userId: string) {
     return this.prisma.board.findMany({
@@ -32,7 +41,10 @@ export class BoardsService {
   async get(userId: string, id: string) {
     const board = await this.prisma.board.findFirst({
       where: { id, ...memberOf(userId) },
-      include: { members: { include: { user: { select: { email: true } } }, orderBy: { joinedAt: 'asc' } } },
+      include: {
+        members: { include: { user: { select: { email: true } } }, orderBy: { joinedAt: 'asc' } },
+        labels: { orderBy: { name: 'asc' } },
+      },
     });
     if (!board) throw new NotFoundException('Board not found');
     return {
@@ -41,6 +53,7 @@ export class BoardsService {
       ownerId: board.ownerId,
       inviteToken: board.ownerId === userId ? board.inviteToken : null,
       members: board.members.map((m) => ({ userId: m.userId, email: m.user.email })),
+      labels: board.labels,
     };
   }
 
@@ -74,6 +87,29 @@ export class BoardsService {
     await this.prisma.board.update({ where: { id }, data: { inviteToken: null } });
   }
 
+  private async assertMember(userId: string, boardId: string) {
+    const board = await this.prisma.board.findFirst({ where: { id: boardId, ...memberOf(userId) } });
+    if (!board) throw new NotFoundException('Board not found');
+  }
+
+  async listLabels(userId: string, boardId: string) {
+    await this.assertMember(userId, boardId);
+    return this.prisma.label.findMany({ where: { boardId }, orderBy: { name: 'asc' } });
+  }
+
+  async createLabel(userId: string, boardId: string, input: UpsertLabelInput) {
+    await this.assertMember(userId, boardId);
+    if ((await this.prisma.label.count({ where: { boardId } })) >= MAX_LABELS_PER_BOARD) {
+      throw new BadRequestException('Label limit reached');
+    }
+    return this.prisma.label.create({ data: { ...input, boardId } });
+  }
+
+  async removeLabel(userId: string, boardId: string, id: string) {
+    await this.assertMember(userId, boardId);
+    await this.prisma.label.deleteMany({ where: { id, boardId } });
+  }
+
   private async byToken(token: string) {
     const board = await this.prisma.board.findUnique({ where: { inviteToken: token } });
     if (!board) throw new NotFoundException('Invitation not found or no longer valid');
@@ -96,7 +132,58 @@ export class BoardsService {
         throw new BadRequestException('This board is full');
       }
       await this.prisma.boardMember.create({ data: { boardId: board.id, userId } });
+      // The actor is the joiner: EventsService uses exactly this to widen an open
+      // stream's board set without re-querying membership on every message.
+      await this.events.record({
+        type: 'MEMBER_JOINED',
+        boardId: board.id,
+        actorId: userId,
+        data: { boardTitle: board.title },
+      });
     }
     return { boardId: board.id };
+  }
+
+  async listActivity(userId: string, boardId: string) {
+    await this.assertMember(userId, boardId);
+    return this.prisma.event.findMany({
+      where: { boardId },
+      orderBy: { createdAt: 'desc' },
+      take: ACTIVITY_PAGE,
+      include: { actor: { select: { email: true, displayName: true } } },
+    });
+  }
+
+  /**
+   * Global card search across every board the user belongs to. The membership filter
+   * is part of the where clause, not a post-filter, so there is no path that returns
+   * a card from someone else's board.
+   */
+  async search(userId: string, term: string) {
+    const query = term.trim();
+    if (query.length < 2) return [];
+    const cards = await this.prisma.card.findMany({
+      where: {
+        list: { board: memberOf(userId) },
+        OR: [
+          { title: { contains: query, mode: 'insensitive' } },
+          { description: { contains: query, mode: 'insensitive' } },
+        ],
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: SEARCH_LIMIT,
+      select: {
+        id: true,
+        title: true,
+        list: { select: { id: true, title: true, board: { select: { id: true, title: true } } } },
+      },
+    });
+    return cards.map((card) => ({
+      cardId: card.id,
+      title: card.title,
+      listTitle: card.list.title,
+      boardId: card.list.board.id,
+      boardTitle: card.list.board.title,
+    }));
   }
 }
