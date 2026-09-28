@@ -1,65 +1,123 @@
-<header class="top-nav">
-  <a routerLink="/dashboard" class="mark">
-    <span class="cavallino" aria-hidden="true"></span>
-    Sprintio
-  </a>
-  <a routerLink="/dashboard" class="back">&larr; Boards</a>
-  <h1 class="board-title">{{ board()?.title }}</h1>
-  <button type="button" class="members" aria-label="Board members" (click)="membersDialog.showModal()">
-    @for (m of members(); track m.userId) {
-      <span class="avatar" [title]="m.email">{{ initial(m.email) }}</span>
+<app-header />
+
+<header class="board-bar">
+  @if (renamingBoard()) {
+    <input
+      #boardTitleInput
+      type="text"
+      class="board-title-input"
+      maxlength="100"
+      aria-label="Board title"
+      autofocus
+      [value]="board()?.title ?? ''"
+      (focus)="boardTitleInput.select()"
+      (blur)="renameBoard(boardTitleInput.value)"
+      (keydown.enter)="boardTitleInput.blur()"
+      (keydown.escape)="renamingBoard.set(false)"
+    />
+  } @else {
+  <div class="dd" (focusout)="boardsOpen.set(false)">
+    <button type="button" class="board-title" aria-haspopup="menu" (click)="toggleBoards()">
+      {{ board()?.title }} <span aria-hidden="true">&#9662;</span>
+    </button>
+    @if (boardsOpen()) {
+      <div class="pop-menu" role="menu" (mousedown)="$event.preventDefault()">
+        @if (isOwner()) {
+          <button type="button" class="pop-menu-item" (click)="boardsOpen.set(false); renamingBoard.set(true)">Rename board</button>
+        }
+        <p class="pop-menu-title">Your boards</p>
+        @for (b of allBoards(); track b.id) {
+          <button type="button" class="pop-menu-item" [class.current]="b.id === boardId" (click)="switchBoard(b.id)">{{ b.title }}</button>
+        }
+      </div>
     }
-  </button>
+  </div>
   @if (isOwner()) {
-    <button type="button" class="btn btn-outline share" (click)="openShare()">Share</button>
+    <button type="button" class="icon-tool" aria-label="Rename board" title="Rename board" (click)="renamingBoard.set(true)">&#9998;</button>
   }
-  <div class="nav-utils">
-    @if (!live()) {
-      <span class="offline" title="Reconnecting to live updates">Offline</span>
+  }
+  @if (!live()) {
+    <span class="offline" title="Reconnecting to live updates">Offline</span>
+  }
+
+  <div class="bar-right">
+    <div class="members" role="group" aria-label="Board members">
+      @for (m of shownMembers(); track m.userId) {
+        <button type="button" class="avatar" [title]="m.email" [style]="avatarStyle(m.userId)" (click)="membersDialog.showModal()">{{ initials(m.displayName, m.email) }}</button>
+      }
+      @if (hiddenMembers() > 0) {
+        <button type="button" class="avatar more" aria-label="All members" (click)="membersDialog.showModal()">+{{ hiddenMembers() }}</button>
+      }
+    </div>
+
+    <div class="dd" (focusout)="filterOpen.set(false)">
+      <button type="button" class="icon-tool" [class.on]="filterActive()" aria-label="Filter cards" title="Filter cards" (click)="filterOpen.set(!filterOpen()); boardsOpen.set(false)">
+        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M1 3h14v1.5H1zm2.5 4h9v1.5h-9zM6 11h4v1.5H6z" /></svg>
+      </button>
+      @if (filterOpen()) {
+        <div class="pop-menu filter-menu" (mousedown)="$event.preventDefault()">
+          <p class="pop-menu-title">Members</p>
+          @for (m of members(); track m.userId) {
+            <button type="button" class="pop-menu-item filter-row" (click)="toggleFilterMember(m.userId)">
+              <span class="avatar" [style]="avatarStyle(m.userId)">{{ initials(m.displayName, m.email) }}</span>
+              <span class="filter-name">{{ m.displayName || m.email }}</span>
+              @if (filterMemberIds().has(m.userId)) {
+                <span class="check" aria-label="Selected">&#10003;</span>
+              }
+            </button>
+          }
+          <p class="pop-menu-title">Labels</p>
+          @for (l of labels(); track l.id) {
+            <button type="button" class="pop-menu-item filter-row" (click)="toggleFilterLabel(l.id)">
+              <span class="label-chip filter-chip" [style]="chipStyle(l.color)">{{ l.name }}</span>
+              @if (filterLabelIds().has(l.id)) {
+                <span class="check" aria-label="Selected">&#10003;</span>
+              }
+            </button>
+          }
+          @if (filterActive()) {
+            <button type="button" class="pop-menu-item" (click)="clearFilters()">Clear filters</button>
+          }
+        </div>
+      }
+    </div>
+
+    <div class="dd" (focusout)="bgOpen.set(false)">
+      <button type="button" class="icon-tool" aria-label="Change background" title="Change background" (click)="bgOpen.set(!bgOpen())">
+        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.3" d="M2 2.5h12v11H2z" /><path fill="currentColor" d="M3.5 12l3-4 2 2.5 1.5-1.5 2.5 3z" /><circle cx="11" cy="5.5" r="1.2" fill="currentColor" /></svg>
+      </button>
+      @if (bgOpen()) {
+        <div class="pop-menu bg-menu" (mousedown)="$event.preventDefault()">
+          <p class="pop-menu-title">Board background</p>
+          <ng-container *ngTemplateOutlet="bgPicker; context: { $implicit: null }" />
+        </div>
+      }
+    </div>
+
+    <button type="button" class="icon-tool" [class.starred]="board()?.starred" [attr.aria-pressed]="board()?.starred" aria-label="Star board" title="Star board" (click)="toggleStar()">
+      <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" [attr.fill-opacity]="board()?.starred ? 1 : 0" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" d="M8 1.6l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.4l-3.8 2 .7-4.3-3.1-3 4.3-.6z" /></svg>
+    </button>
+
+    @if (isOwner()) {
+      <button type="button" class="btn btn-outline share" (click)="openShare()">Share</button>
     }
-    <app-notification-bell />
-    <app-theme-toggle />
   </div>
 </header>
 
-<div class="filter-bar">
-  <input
-    type="search"
-    placeholder="Filter cards by title"
-    [value]="filterText()"
-    (input)="setFilterText($any($event.target).value)"
-  />
-  <div class="filter-group">
-    @for (l of labels(); track l.id) {
-      <button
-        type="button"
-        class="filter-swatch"
-        [class.on]="filterLabelIds().has(l.id)"
-        [style.background]="l.color"
-        [title]="l.name || 'Unnamed label'"
-        (click)="toggleFilterLabel(l.id)"
-      ></button>
-    }
-  </div>
-  <div class="filter-group">
-    @for (m of members(); track m.userId) {
-      <button
-        type="button"
-        class="avatar filter-avatar"
-        [class.on]="filterMemberIds().has(m.userId)"
-        [title]="m.email"
-        (click)="toggleFilterMember(m.userId)"
-      >
-        {{ initial(m.email) }}
-      </button>
-    }
-  </div>
-  @if (filterActive()) {
-    <button type="button" class="btn btn-outline filter-clear" (click)="clearFilters()">Clear filter</button>
-  }
-</div>
+<!-- Outside every popover: opening the file dialog blurs them, which would remove an input living inside. -->
+<input #bgFile type="file" hidden accept="image/png,image/jpeg,image/gif,image/webp" (change)="uploadBackground(bgFile)" />
 
-<main>
+<ng-template #bgPicker let-list>
+  <div class="bg-grid">
+    @for (c of labelColors; track c) {
+      <button type="button" class="bg-swatch" [style.background]="c" [attr.aria-label]="'Background ' + c" (click)="setBackground(list, c)"></button>
+    }
+  </div>
+  <button type="button" class="pop-menu-item" (click)="pickBackgroundImage(list, bgFile)">Upload image&hellip;</button>
+  <button type="button" class="pop-menu-item" (click)="setBackground(list, '')">Remove background</button>
+</ng-template>
+
+<main [style]="bgStyle(board()?.background)">
   <div
     class="lists-row"
     cdkDropList
@@ -68,7 +126,7 @@
     (cdkDropListDropped)="dropList($event)"
   >
     @for (list of lists(); track list.id) {
-      <section class="list-col" cdkDrag>
+      <section class="list-col" [class.has-bg]="list.background" [style]="bgStyle(list.background)" cdkDrag>
         <header class="list-header" cdkDragHandle>
           @if (renaming() === list.id) {
             <input
@@ -87,7 +145,11 @@
           }
           <details #menu class="menu">
             <summary class="icon-btn" aria-label="List actions">&hellip;</summary>
-            <button type="button" class="menu-item" (click)="menu.open = false; askDelete(list.title, () => removeList(list.id), 'All its cards will be deleted too.')">Delete list</button>
+            <div class="menu-panel">
+              <p class="pop-menu-title">Background</p>
+              <ng-container *ngTemplateOutlet="bgPicker; context: { $implicit: list }" />
+              <button type="button" class="menu-item" (click)="menu.open = false; askDelete(list.title, () => removeList(list.id), 'All its cards will be deleted too.')">Delete list</button>
+            </div>
           </details>
         </header>
 
@@ -115,7 +177,7 @@
                   <span class="label-row">
                     @for (l of labels(); track l.id) {
                       @if (isLabelOn(card, l)) {
-                        <span class="label-swatch" [style.background]="l.color" [title]="l.name"></span>
+                        <span class="label-chip" [style]="chipStyle(l.color)">{{ l.name }}</span>
                       }
                     }
                   </span>
@@ -146,7 +208,7 @@
               </div>
               <span class="card-tools">
                 @for (a of card.assignees; track a.userId) {
-                  <span class="avatar" [title]="emailOf(a.userId)">{{ initial(emailOf(a.userId)) }}</span>
+                  <span class="avatar" [title]="emailOf(a.userId)" [style]="avatarStyle(a.userId)">{{ initials(memberOf(a.userId)?.displayName, emailOf(a.userId)) }}</span>
                 }
                 <button
                   type="button"
@@ -221,64 +283,83 @@
   @if (editing(); as card) {
     <form
       class="card-dialog-grid"
-      (submit)="$event.preventDefault(); saveCard(titleField.value, descField.value, dueField.value)"
+      (submit)="$event.preventDefault(); saveCard(descField.value)"
     >
-      <div class="card-dialog-main">
-        <label class="label-caps" for="card-title">Title</label>
-        <input #titleField id="card-title" type="text" [value]="card.title" maxlength="200" />
-
-        <label class="label-caps">Labels</label>
-        <div class="label-list">
-          @for (l of labels(); track l.id) {
-            <div class="label-row-item" [class.off]="!isLabelOn(card, l)">
-              <button type="button" class="label-toggle" (click)="toggleLabel(card, l)">
-                <span class="label-swatch" [style.background]="l.color"></span>
-                <span>{{ l.name || 'Unnamed' }}</span>
-              </button>
-              <button type="button" class="icon-btn label-remove" aria-label="Delete label" (click)="removeBoardLabel(l)">&times;</button>
+      <div class="card-dialog-head">
+        <select
+          #listTab
+          class="list-tab"
+          aria-label="List"
+          [value]="card.listId"
+          (change)="moveCurrentCard(card, $any($event.target).value)"
+        >
+          @for (l of lists(); track l.id) {
+            <option [value]="l.id">{{ l.title }}</option>
+          }
+        </select>
+        <div class="card-head-tools">
+          <details #cardMenu class="menu">
+            <summary class="icon-btn" aria-label="Card actions">&#8943;</summary>
+            <div class="menu-panel">
+              <button type="button" class="menu-item" (click)="cardMenu.open = false; listTab.showPicker()">Move card</button>
+              <button type="button" class="menu-item" (click)="cardMenu.open = false; copyCard(card)">Copy</button>
+              <button type="button" class="menu-item" (click)="cardMenu.open = false; toggleFollow(card)">{{ isFollowed(card) ? 'Unfollow' : 'Follow' }}</button>
+              <button type="button" class="menu-item" (click)="cardMenu.open = false; shareCard(card)">Share</button>
+              <button type="button" class="menu-item" (click)="cardMenu.open = false; archiveCard(card)">Archive</button>
             </div>
-          }
+          </details>
+          <button type="button" class="icon-btn" aria-label="Close" (click)="cardDialog.close()">&times;</button>
         </div>
-        <div class="new-label">
-          @for (c of labelColors; track c) {
-            <button
-              type="button"
-              class="color-dot"
-              [class.picked]="pickedColor() === c"
-              [style.background]="c"
-              (click)="pickedColor.set(c)"
-              [attr.aria-label]="'Pick color ' + c"
-            ></button>
-          }
-          <input #labelNameInput type="text" placeholder="New label name" maxlength="40" />
-          <button type="button" class="btn btn-outline" (click)="addBoardLabel(pickedColor(), labelNameInput)">Add label</button>
+      </div>
+
+      <div class="card-dialog-main">
+        @if (editingTitle()) {
+          <input
+            #titleField
+            id="card-title"
+            type="text"
+            class="card-title-input"
+            [value]="card.title"
+            maxlength="200"
+            autofocus
+            (blur)="saveTitle(card, titleField)"
+            (keydown.enter)="titleField.blur()"
+            (keydown.escape)="editingTitle.set(false)"
+          />
+        } @else {
+          <h2 class="card-title-display" (click)="editingTitle.set(true)">{{ card.title }}</h2>
+        }
+
+        <div class="card-meta-row">
+          <div class="meta-col">
+            <label class="label-caps">Members</label>
+            <div class="meta-chips">
+              @for (a of card.assignees; track a.userId) {
+                <span class="avatar" [title]="emailOf(a.userId)" [style]="avatarStyle(a.userId)">{{ initials(memberOf(a.userId)?.displayName, emailOf(a.userId)) }}</span>
+              }
+              <button type="button" class="add-chip" aria-label="Add members" (click)="openMembers(card, $any($event.currentTarget))">+</button>
+            </div>
+          </div>
+          <div class="meta-col">
+            <label class="label-caps">Labels</label>
+            <div class="meta-chips">
+              @for (l of labels(); track l.id) {
+                @if (isLabelOn(card, l)) {
+                  <span class="label-chip" [style]="chipStyle(l.color)">{{ l.name }}</span>
+                }
+              }
+              <button type="button" class="add-chip" aria-label="Add labels" (click)="openLabels(card, $any($event.currentTarget))">+</button>
+            </div>
+          </div>
         </div>
 
-        <label class="label-caps" for="card-due">Due date</label>
-        <div class="due-row">
-          <input #dueField id="card-due" type="date" [value]="dateInputValue(card.dueDate)" />
-          @if (card.dueDate) {
-            <span class="due-check">
-              <input
-                type="checkbox"
-                id="card-due-done"
-                [checked]="card.dueDone"
-                (change)="toggleDueDone(card)"
-              />
-              <label for="card-due-done">Complete</label>
-            </span>
-          }
-        </div>
-
-        <label class="label-caps" for="card-desc">Description</label>
-        <textarea
+        <label class="label-caps" >Description</label>
+        <app-rich-editor
           #descField
-          id="card-desc"
-          rows="5"
-          maxlength="5000"
-          placeholder="Add a more detailed description"
-          [value]="card.description ?? ''"
-        ></textarea>
+          [rows]="5"
+          hint="Insert your description here"
+          [initial]="card.description ?? ''"
+        />
 
         <label class="label-caps">
           Checklist
@@ -311,13 +392,24 @@
           <button type="button" class="btn btn-outline" (click)="addChecklistItem(card, itemInput)">Add</button>
         </div>
 
-        <label class="label-caps">Time tracking &mdash; {{ totalHours(card) }}h logged</label>
+        <div class="section-head">
+          <span class="section-icon" aria-hidden="true">&#9201;</span>
+          <h3 class="section-title">Time tracking</h3>
+        </div>
+        <p class="time-summary">Time: <strong>{{ totalHours(card) }}h</strong></p>
+        <div class="time-me">
+          <span class="time-me-who">
+            <span class="avatar" [style]="avatarStyle(currentUserId)">{{ initials(memberOf(currentUserId ?? '')?.displayName, emailOf(currentUserId ?? '')) }}</span>
+            <span>{{ memberOf(currentUserId ?? '')?.displayName || emailOf(currentUserId ?? '') }}</span>
+          </span>
+          <button type="button" class="btn btn-outline time-add" (click)="openTime($any($event.currentTarget), timePop)">Add time</button>
+        </div>
         <ul class="time-list">
           @for (e of timeEntries(); track e.id) {
             <li class="time-row">
               <span class="time-date">{{ formatEntryDate(e.date) }}</span>
               <span class="time-hours">{{ e.hours }}h</span>
-              <span class="time-who">{{ e.user.email }}</span>
+              <span class="time-who">{{ e.user.displayName || e.user.email }}</span>
               @if (e.note) {
                 <span class="time-note">{{ e.note }}</span>
               }
@@ -327,45 +419,54 @@
             </li>
           }
         </ul>
-        <div class="new-time">
-          <input #timeDate type="date" aria-label="Date worked" />
-          <input #timeHours type="number" min="0.25" max="24" step="0.25" placeholder="Hours" aria-label="Hours" />
-          <input #timeNote type="text" placeholder="Note (optional)" maxlength="200" aria-label="Note" />
-          <button type="button" class="btn btn-outline" (click)="addTimeEntry(card, timeDate, timeHours, timeNote)">Log time</button>
-        </div>
-
-        <label class="label-caps">Attachments</label>
-        <div class="attachment-list">
-          @for (a of attachments(); track a.id) {
-            <div class="attachment">
-              <img [src]="attachmentUrl(a)" [alt]="a.originalName" />
-              <div class="attachment-meta">
-                <span class="attachment-name">{{ a.originalName }}</span>
-                @if (a.uploaderId === currentUserId) {
-                  <button type="button" class="icon-btn" aria-label="Delete attachment" (click)="removeAttachment(card, a)">&times;</button>
-                }
-              </div>
-            </div>
-          }
-        </div>
-        <input #fileInput type="file" accept="image/png,image/jpeg,image/gif,image/webp" (change)="uploadAttachment(card, fileInput)" />
 
         <div class="dialog-actions">
-          <button type="submit" class="btn btn-primary">Save</button>
+          <button type="submit" class="btn btn-primary" (mousedown)="$event.preventDefault()">Save</button>
           <button type="button" class="btn btn-outline" (click)="cardDialog.close()">Cancel</button>
           <button type="button" class="icon-btn danger" (click)="askDeleteCard(card)">Delete card</button>
         </div>
       </div>
 
       <div class="card-dialog-side">
-        <label class="label-caps">Comments</label>
+        <div class="side-head">
+          <label class="label-caps">Comments</label>
+          <input
+            #fileInput
+            type="file"
+            hidden
+            accept="image/png,image/jpeg,image/gif,image/webp"
+            (change)="pickCommentFile(fileInput)"
+          />
+        </div>
+        @if (attachments().length) {
+          <div class="attachment-list">
+            @for (a of attachments(); track a.id) {
+              <div class="attachment">
+                <img [src]="attachmentUrl(a)" [alt]="a.originalName" />
+                <div class="attachment-meta">
+                  <span class="attachment-name">{{ a.originalName }}</span>
+                  @if (a.uploaderId === currentUserId) {
+                    <button type="button" class="icon-btn" aria-label="Delete attachment" (click)="removeAttachment(card, a)">&times;</button>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        }
         <ul class="comment-list">
           @for (c of comments(); track c.id) {
             <li class="comment">
-              <span class="avatar">{{ initial(c.author.email) }}</span>
+              <span class="avatar" [style]="avatarStyle(c.authorId)">{{ initials(c.author.displayName, c.author.email) }}</span>
               <div class="comment-body">
                 <p class="comment-meta">{{ c.author.email }}</p>
-                <p class="comment-text">{{ c.body }}</p>
+                @if (c.body) {
+                  <div class="comment-text rich-out" [innerHTML]="c.body | rich"></div>
+                }
+                @for (a of c.attachments; track a.id) {
+                  <a class="comment-img" [href]="attachmentUrl(a)" target="_blank" rel="noopener">
+                    <img [src]="attachmentUrl(a)" [alt]="a.originalName" />
+                  </a>
+                }
               </div>
               @if (c.authorId === currentUserId) {
                 <button type="button" class="icon-btn" aria-label="Delete comment" (click)="removeComment(card, c)">&times;</button>
@@ -374,13 +475,20 @@
           }
         </ul>
         <div class="new-comment">
-          <textarea
+          <app-rich-editor
             #commentField
-            rows="2"
-            maxlength="2000"
-            placeholder="Write a comment — @email to mention a member"
-          ></textarea>
-          <button type="button" class="btn btn-outline" (click)="addComment(card, commentField)">Comment</button>
+            [rows]="2"
+            hint="Insert your comment here — @email to mention a member"
+          >
+            <button type="button" class="attach-btn" aria-label="Attach image" title="Attach image" (click)="fileInput.click()">&#128206;</button>
+          </app-rich-editor>
+          @if (pendingFile(); as f) {
+            <p class="pending-file">
+              <span class="attachment-name">&#128206; {{ f.name }}</span>
+              <button type="button" class="icon-btn" aria-label="Remove image" (click)="pendingFile.set(null)">&times;</button>
+            </p>
+          }
+          <button type="button" class="btn btn-outline" (mousedown)="$event.preventDefault()" (click)="addComment(card, commentField)">Comment</button>
         </div>
 
         <label class="label-caps activity-head">Activity</label>
@@ -398,7 +506,117 @@
         </ul>
       </div>
     </form>
+
+    <!-- Outside the <form> so Enter in its fields can't submit (and close) the card. -->
+    <div #timePop popover class="member-pop time-pop">
+      <div class="pop-head">
+        <span></span>
+        <p class="pop-head-title">Add time</p>
+        <button type="button" class="icon-btn" aria-label="Close add time" (click)="timePop.hidePopover()">&times;</button>
+      </div>
+      <label class="pop-field" for="time-member">Member</label>
+      <select id="time-member" [value]="timeMemberId()" (change)="timeMemberId.set($any($event.target).value)">
+        @for (m of members(); track m.userId) {
+          <option [value]="m.userId">{{ m.displayName || m.email }}</option>
+        }
+      </select>
+      <div class="time-pop-row">
+        <div>
+          <label class="pop-field" for="time-hours">Time</label>
+          <input
+            id="time-hours"
+            type="text"
+            inputmode="decimal"
+            placeholder="0h"
+            [value]="timeHours()"
+            (input)="timeHours.set($any($event.target).value)"
+          />
+        </div>
+        <div>
+          <label class="pop-field" for="time-date">Date</label>
+          <input id="time-date" type="date" [value]="timeDate()" (input)="timeDate.set($any($event.target).value)" />
+        </div>
+      </div>
+      <label class="pop-field" for="time-note">Comment</label>
+      <textarea
+        id="time-note"
+        rows="3"
+        maxlength="200"
+        placeholder="Describe your progress..."
+        [value]="timeNote()"
+        (input)="timeNote.set($any($event.target).value)"
+      ></textarea>
+      <div class="pop-foot">
+        <button type="button" class="btn btn-primary" [disabled]="timeHoursValue() === null || !timeDate()" (click)="addTimeEntry(card, timePop)">Add</button>
+      </div>
+    </div>
   }
+
+  <!-- These live inside the dialog on purpose: showModal() makes everything outside
+       the dialog inert, so a popover declared outside renders but ignores every click. -->
+  <div #memberPopModal popover class="member-pop">
+    <ng-container [ngTemplateOutlet]="memberList" />
+  </div>
+  <div #labelPop popover class="member-pop label-pop">
+    @if (labelView() === 'list') {
+      <p class="label-caps pop-title">Labels</p>
+      @if (popoverCard(); as card) {
+        <ul>
+          @for (l of labels(); track l.id) {
+            <li class="label-pop-row">
+              <button type="button" class="member-row" (click)="toggleLabel(card, l)">
+                <span class="label-chip" [style]="chipStyle(l.color)">{{ l.name }}</span>
+                @if (isLabelOn(card, l)) {
+                  <span class="check" aria-label="Applied">&#10003;</span>
+                }
+              </button>
+              <button type="button" class="icon-btn label-remove" aria-label="Delete label" (click)="removeBoardLabel(l)">&times;</button>
+            </li>
+          }
+        </ul>
+      }
+      <button type="button" class="btn btn-outline pop-wide" (click)="startCreateLabel()">Create a new label</button>
+    } @else {
+      <div class="pop-head">
+        <button type="button" class="icon-btn" aria-label="Back" (click)="setLabelView('list')">&#8249;</button>
+        <p class="pop-head-title">Create label</p>
+        <button type="button" class="icon-btn" aria-label="Close labels" (click)="labelPop.hidePopover()">&times;</button>
+      </div>
+      <div class="label-preview">
+        <span class="label-chip" [style]="chipStyle(pickedColor())">{{ newLabelName() }}</span>
+      </div>
+      <label class="pop-field" for="new-label-name">Title</label>
+      <input
+        id="new-label-name"
+        type="text"
+        maxlength="40"
+        [value]="newLabelName()"
+        (input)="newLabelName.set($any($event.target).value)"
+        (keydown.enter)="createLabel()"
+      />
+      <p class="pop-field">Select a color</p>
+      <div class="color-grid">
+        @for (c of labelColors; track c) {
+          <button
+            type="button"
+            class="color-cell"
+            [class.picked]="pickedColor() === c"
+            [style]="chipStyle(c)"
+            (click)="pickedColor.set(c)"
+            [attr.aria-label]="'Color ' + c"
+          >
+            @if (pickedColor() === c) {
+              &#10003;
+            }
+          </button>
+        }
+      </div>
+      <button type="button" class="btn btn-outline pop-wide" [disabled]="!pickedColor()" (click)="pickedColor.set('')">&times; Remove color</button>
+      <div class="pop-foot">
+        <button type="button" class="btn btn-primary" [disabled]="!newLabelName().trim() && !pickedColor()" (click)="createLabel()">Create</button>
+      </div>
+    }
+  </div>
 </dialog>
 
 <dialog #confirmDialog class="card-dialog confirm-dialog">
@@ -417,15 +635,15 @@
   </div>
 </dialog>
 
-<div #memberPop popover class="member-pop">
+<ng-template #memberList>
   <p class="label-caps pop-title">Members</p>
   @if (popoverCard(); as card) {
     <ul>
       @for (m of members(); track m.userId) {
         <li>
           <button type="button" class="member-row" (click)="toggleAssignee(card, m)">
-            <span class="avatar">{{ initial(m.email) }}</span>
-            <span class="member-email">{{ m.email }}</span>
+            <span class="avatar" [style]="avatarStyle(m.userId)">{{ initials(m.displayName, m.email) }}</span>
+            <span class="member-email" [title]="m.email">{{ m.displayName || m.email }}</span>
             @if (isAssigned(card, m.userId)) {
               <span class="check" aria-label="Assigned">&#10003;</span>
             }
@@ -434,6 +652,11 @@
       }
     </ul>
   }
+</ng-template>
+
+<!-- Board-level copy, opened from the card face. -->
+<div #memberPop popover class="member-pop">
+  <ng-container [ngTemplateOutlet]="memberList" />
 </div>
 
 <dialog #membersDialog class="card-dialog share-dialog">
@@ -441,7 +664,7 @@
   <ul class="member-list">
     @for (m of members(); track m.userId) {
       <li class="member-line">
-        <span class="avatar">{{ initial(m.email) }}</span>
+        <span class="avatar" [style]="avatarStyle(m.userId)">{{ initials(m.displayName, m.email) }}</span>
         <span class="member-email">{{ m.email }}</span>
         @if (m.userId === board()?.ownerId) {
           <span class="member-note">Owner</span>

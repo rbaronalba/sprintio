@@ -39,7 +39,7 @@ describe('LoginComponent', () => {
     });
 
     await fixture.whenStable();
-    expect(TestBed.inject(Router).url).toBe('/dashboard');
+    expect(TestBed.inject(Router).url).toBe('/home');
   });
 
   it('shows an error when the credentials are rejected', async () => {

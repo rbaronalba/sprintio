@@ -1,7 +1,7 @@
 const B='http://localhost:3001';
 const stamp=Date.now();
 const call=async(m,p,t,body)=>{const r=await fetch(B+p,{method:m,headers:{'content-type':'application/json',...(t?{authorization:'Bearer '+t}:{})},body:body?JSON.stringify(body):undefined});let j=null;try{j=await r.json()}catch{}return{s:r.status,j}};
-const reg=async(n)=>{const r=await call('POST','/auth/register',null,{email:`smoke-${n}-${stamp}@sprintio.test`,password:'smoke-pass-1234'});return{t:r.j.accessToken,id:r.j.user.sub}};
+const reg=async(n)=>{const r=await call('POST','/auth/register',null,{email:`smoke-${n}-${stamp}@sprintio.test`,password:'smoke-pass-1234',firstName:'Smoke',lastName:n});return{t:r.j.accessToken,id:r.j.user.sub}};
 const ok=(name,cond,extra='')=>{console.log((cond?'PASS ':'FAIL ')+name+(cond?'':' '+JSON.stringify(extra)));if(!cond)process.exitCode=1};
 
 const A=await reg('a'),Bo=await reg('b'),C=await reg('c');
@@ -14,6 +14,10 @@ ok('card create returns empty timeEntries[]',Array.isArray(card.timeEntries)&&ca
 ok('card create returns attachments count',card._count.attachments===0);
 
 // time entries
+const onBehalf=await call('POST',`/cards/${card.id}/time`,A.t,{date:'2026-09-05',hours:1,userId:Bo.id});
+ok('member can log time for another member',onBehalf.s===201&&onBehalf.j.userId===Bo.id&&onBehalf.j.user.displayName==='Smoke b');
+ok('cannot log time for a non-member',(await call('POST',`/cards/${card.id}/time`,A.t,{date:'2026-09-05',hours:1,userId:C.id})).s===400);
+await call('DELETE',`/cards/${card.id}/time/${onBehalf.j.id}`,Bo.t);
 ok('stranger cannot list time',(await call('GET',`/cards/${card.id}/time`,C.t)).s===404);
 ok('hours out of range rejected',(await call('POST',`/cards/${card.id}/time`,A.t,{date:'2026-09-05',hours:25})).s===400);
 ok('bad date rejected',(await call('POST',`/cards/${card.id}/time`,A.t,{date:'nope',hours:2})).s===400);

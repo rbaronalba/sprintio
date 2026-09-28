@@ -1,8 +1,9 @@
 const B='http://localhost:3001';
 const stamp=Date.now();
 const call=async(m,p,t,body)=>{const r=await fetch(B+p,{method:m,headers:{'content-type':'application/json',...(t?{authorization:'Bearer '+t}:{})},body:body?JSON.stringify(body):undefined});let j=null;try{j=await r.json()}catch{}return{s:r.status,j}};
-const reg=async(n)=>{const r=await call('POST','/auth/register',null,{email:`smoke-${n}-${stamp}@sprintio.test`,password:'smoke-pass-1234'});return{t:r.j.accessToken,id:r.j.user.sub}};
+const reg=async(n)=>{const r=await call('POST','/auth/register',null,{email:`smoke-${n}-${stamp}@sprintio.test`,password:'smoke-pass-1234',firstName:'Smoke',lastName:n});return{t:r.j.accessToken,id:r.j.user.sub}};
 const ok=(name,cond,extra='')=>{console.log((cond?'PASS ':'FAIL ')+name+(cond?'':' '+extra));if(!cond)process.exitCode=1};
+ok('register without a last name is rejected',(await call('POST','/auth/register',null,{email:`smoke-noname-${stamp}@sprintio.test`,password:'smoke-pass-1234',firstName:'Only'})).s===400);
 const A=await reg('a'),Bo=await reg('b'),C=await reg('c');
 const board=(await call('POST','/boards',A.t,{title:'Smoke'})).j;
 const list=(await call('POST',`/boards/${board.id}/lists`,A.t,{title:'L'})).j;
@@ -21,6 +22,7 @@ ok('join works',(await call('POST',`/boards/join/${inv.token}`,Bo.t)).s===201);
 ok('join is idempotent',(await call('POST',`/boards/join/${inv.token}`,Bo.t)).s===201);
 const bd=(await call('GET',`/boards/${board.id}`,Bo.t)).j;
 ok('member reads board with 2 members',bd.members?.length===2);
+ok('members carry their display name',bd.members.every(m=>typeof m.displayName==='string'&&m.displayName.startsWith('Smoke')));
 ok('member does NOT see invite token',bd.inviteToken===null);
 ok('owner sees invite token',(await call('GET',`/boards/${board.id}`,A.t)).j.inviteToken===inv.token);
 ok('shared board in member list',(await call('GET','/boards',Bo.t)).j.some(x=>x.id===board.id));

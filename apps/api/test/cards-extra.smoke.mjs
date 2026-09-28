@@ -1,7 +1,7 @@
 const B='http://localhost:3001';
 const stamp=Date.now();
 const call=async(m,p,t,body)=>{const r=await fetch(B+p,{method:m,headers:{'content-type':'application/json',...(t?{authorization:'Bearer '+t}:{})},body:body?JSON.stringify(body):undefined});let j=null;try{j=await r.json()}catch{}return{s:r.status,j}};
-const reg=async(n)=>{const r=await call('POST','/auth/register',null,{email:`smoke-${n}-${stamp}@sprintio.test`,password:'smoke-pass-1234'});return{t:r.j.accessToken,id:r.j.user.sub}};
+const reg=async(n)=>{const r=await call('POST','/auth/register',null,{email:`smoke-${n}-${stamp}@sprintio.test`,password:'smoke-pass-1234',firstName:'Smoke',lastName:n});return{t:r.j.accessToken,id:r.j.user.sub}};
 const ok=(name,cond,extra='')=>{console.log((cond?'PASS ':'FAIL ')+name+(cond?'':' '+JSON.stringify(extra)));if(!cond)process.exitCode=1};
 
 const A=await reg('a'),Bo=await reg('b'),C=await reg('c');
@@ -15,9 +15,11 @@ ok('card create returns labels[] and comment count',Array.isArray(card.labels)&&
 // labels
 ok('stranger cannot list labels',(await call('GET',`/boards/${board.id}/labels`,C.t)).s===404);
 ok('bad color rejected',(await call('POST',`/boards/${board.id}/labels`,A.t,{name:'x',color:'#ffffff'})).s===400);
-const label=(await call('POST',`/boards/${board.id}/labels`,A.t,{name:'Urgent',color:'#c8102e'})).j;
-ok('label created with fixed color',label.color==='#c8102e');
-ok('member can create labels too',(await call('POST',`/boards/${board.id}/labels`,Bo.t,{name:'Later',color:'#2e7fd9'})).s===201);
+const label=(await call('POST',`/boards/${board.id}/labels`,A.t,{name:'Urgent',color:'#c9372c'})).j;
+ok('label created with fixed color',label.color==='#c9372c');
+ok('colorless named label allowed',(await call('POST',`/boards/${board.id}/labels`,A.t,{name:'Plain',color:''})).s===201);
+ok('label with neither name nor color rejected',(await call('POST',`/boards/${board.id}/labels`,A.t,{name:'',color:''})).s===400);
+ok('member can create labels too',(await call('POST',`/boards/${board.id}/labels`,Bo.t,{name:'Later',color:'#579dff'})).s===201);
 ok('member can attach label to card',(await call('PUT',`/cards/${card.id}/labels/${label.id}`,Bo.t)).s===200);
 ok('attach twice is fine',(await call('PUT',`/cards/${card.id}/labels/${label.id}`,Bo.t)).s===200);
 const lists1=(await call('GET',`/boards/${board.id}/lists`,A.t)).j;
@@ -44,6 +46,16 @@ ok('cannot delete someone else\'s comment',(await call('DELETE',`/cards/${card.i
 ok('author deletes own comment',(await call('DELETE',`/cards/${card.id}/comments/${c1.id}`,A.t)).s===200);
 ok('comment gone',(await call('GET',`/cards/${card.id}/comments`,A.t)).j.length===1);
 ok('stranger cannot comment',(await call('POST',`/cards/${card.id}/comments`,C.t,{body:'x'})).s===404);
+
+// archive
+const listRes=async()=>(await call('GET',`/boards/${board.id}/lists`,A.t)).j;
+await call('PATCH',`/cards/${card.id}`,A.t,{archived:true});
+const afterArchive=await listRes();
+ok('archive removes card from board query',afterArchive.every(l=>l.cards.every(c=>c.id!==card.id)));
+ok('archived card still readable directly',(await call('GET',`/cards/${card.id}/comments`,A.t)).s===200);
+await call('PATCH',`/cards/${card.id}`,A.t,{archived:false});
+const afterUnarchive=await listRes();
+ok('unarchive brings it back',afterUnarchive.some(l=>l.cards.some(c=>c.id===card.id)));
 
 await call('DELETE',`/boards/${board.id}`,A.t);
 console.log('stamp',stamp);

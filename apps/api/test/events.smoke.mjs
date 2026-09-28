@@ -1,7 +1,7 @@
 const B='http://localhost:3001';
 const stamp=Date.now();
 const call=async(m,p,t,body)=>{const r=await fetch(B+p,{method:m,headers:{'content-type':'application/json',...(t?{authorization:'Bearer '+t}:{})},body:body?JSON.stringify(body):undefined});let j=null;try{j=await r.json()}catch{}return{s:r.status,j}};
-const reg=async(n)=>{const email=`smoke-${n}-${stamp}@sprintio.test`;const r=await call('POST','/auth/register',null,{email,password:'smoke-pass-1234'});return{t:r.j.accessToken,id:r.j.user.sub,email}};
+const reg=async(n)=>{const email=`smoke-${n}-${stamp}@sprintio.test`;const r=await call('POST','/auth/register',null,{email,password:'smoke-pass-1234',firstName:'Smoke',lastName:n});return{t:r.j.accessToken,id:r.j.user.sub,email}};
 const ok=(name,cond,extra='')=>{console.log((cond?'PASS ':'FAIL ')+name+(cond?'':' '+JSON.stringify(extra)));if(!cond)process.exitCode=1};
 // Collects SSE payloads until stop() is called.
 const listen=async(ticket)=>{const ac=new AbortController();const out=[];const p=(async()=>{try{const r=await fetch(`${B}/events/stream?ticket=${ticket}`,{signal:ac.signal});const rd=r.body.getReader();const dec=new TextDecoder();let buf='';for(;;){const{done,value}=await rd.read();if(done)break;buf+=dec.decode(value,{stream:true});const lines=buf.split('\n');buf=lines.pop();for(const line of lines){if(line.startsWith('data: ')){try{out.push(JSON.parse(line.slice(6)))}catch{}}}}}catch{}})();return{stop:async()=>{ac.abort();await p;return out}}};

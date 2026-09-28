@@ -1,0 +1,123 @@
+<header class="bar">
+  <a routerLink="/home" class="mark">
+    <span class="cavallino" aria-hidden="true"></span>
+    Sprintio
+  </a>
+
+  <div class="center">
+    <div class="search" (focusout)="closeSearch()">
+      <input
+        type="search"
+        class="search-input"
+        placeholder="Search"
+        aria-label="Search boards and cards"
+        autocomplete="off"
+        [value]="term()"
+        (focus)="openSearch()"
+        (input)="onInput($any($event.target).value)"
+        (keydown.escape)="closeSearch()"
+      />
+      @if (searchOpen()) {
+        <div class="dropdown" (mousedown)="$event.preventDefault()">
+          @if (!searching) {
+            <p class="drop-title">Recent boards</p>
+            @for (b of recent(); track b.id) {
+              <button type="button" class="row" (click)="openBoard(b.id)">
+                <span class="row-title">{{ b.title }}</span>
+              </button>
+            } @empty {
+              <p class="empty-note">No boards yet.</p>
+            }
+          } @else if (answeredFor() !== term().trim()) {
+            <p class="empty-note">Searching…</p>
+          } @else if (hits().length) {
+            <p class="drop-title">Cards</p>
+            @for (h of hits(); track h.cardId) {
+              <button type="button" class="row" (click)="openBoard(h.boardId, h.cardId)">
+                <span class="row-title">{{ h.title }}</span>
+                <span class="row-where">{{ h.boardTitle }}: {{ h.listTitle }}</span>
+              </button>
+            }
+          } @else {
+            <div class="empty-state">
+              <span class="empty-icon" aria-hidden="true">?</span>
+              <p class="empty-head">Nothing matches your search.</p>
+              <p class="empty-note">Try again with a different term.</p>
+            </div>
+          }
+        </div>
+      }
+    </div>
+    <button type="button" class="create" (click)="openCreate()">Create board</button>
+  </div>
+
+  <div class="right">
+    <app-theme-toggle />
+    @if (auth.currentUser(); as user) {
+      <div class="account" (focusout)="menuOpen.set(false)">
+        <button
+          type="button"
+          class="avatar"
+          aria-label="Account"
+          [style]="avatarStyle(user.sub)"
+          (click)="menuOpen.set(!menuOpen())"
+        >
+          {{ initials(user.displayName, user.email) }}
+        </button>
+        @if (menuOpen()) {
+          <div class="dropdown account-menu" (mousedown)="$event.preventDefault()">
+            <p class="drop-title">Account</p>
+            <p class="acc-name">{{ user.displayName || user.email }}</p>
+            <p class="acc-email">{{ user.email }}</p>
+            <button type="button" class="row" (click)="openProfile()"><span class="row-title">Profile</span></button>
+            <button type="button" class="row" (click)="logout()"><span class="row-title">Log out</span></button>
+          </div>
+        }
+      </div>
+    }
+  </div>
+</header>
+
+<dialog #createDialog class="profile-dialog">
+  <form (submit)="$event.preventDefault(); createBoard(titleField.value, wsField.value)">
+    <p class="label-caps">Create board</p>
+    <label class="label-caps" for="board-title">Board title</label>
+    <input #titleField id="board-title" type="text" maxlength="100" autofocus autocomplete="off" />
+    <label class="label-caps" for="board-workspace">Workspace</label>
+    <!-- No workspaces yet: "" (the API files it in a new default one), plus the create option. -->
+    <select #wsField id="board-workspace" (change)="newWorkspace.set(wsField.value === NEW_WS)">
+      @for (w of ownWorkspaces(); track w.id) {
+        <option [value]="w.id">{{ w.name }}</option>
+      } @empty {
+        <option value="">My workspace</option>
+      }
+      <option [value]="NEW_WS">+ Create workspace&hellip;</option>
+    </select>
+    @if (newWorkspace()) {
+      <label class="label-caps" for="new-workspace">New workspace name</label>
+      <input #newWsField id="new-workspace" type="text" maxlength="60" placeholder="e.g. Software" autocomplete="off" autofocus />
+    }
+    <div class="dialog-actions">
+      <button type="submit" class="btn btn-primary">Create</button>
+      <button type="button" class="btn btn-outline" (click)="createDialog.close()">Cancel</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog #profileDialog class="profile-dialog">
+  <p class="label-caps">Profile</p>
+  <p class="acc-email">{{ auth.currentUser()?.email }}</p>
+  <label class="label-caps" for="display-name">Display name</label>
+  <input
+    #nameField
+    id="display-name"
+    type="text"
+    maxlength="60"
+    placeholder="Shown instead of your email"
+    [value]="auth.currentUser()?.displayName ?? ''"
+  />
+  <div class="dialog-actions">
+    <button type="button" class="btn btn-primary" (click)="saveProfile(nameField.value)">Save</button>
+    <button type="button" class="btn btn-outline" (click)="profileDialog.close()">Cancel</button>
+  </div>
+</dialog>

@@ -34,7 +34,7 @@ export class LoginComponent {
       next: () => {
         // Only in-app paths: a returnUrl like '//evil.com' must never leave the site.
         const back = this.route.snapshot.queryParamMap.get('returnUrl');
-        void this.router.navigateByUrl(back?.startsWith('/') && !back.startsWith('//') ? back : '/dashboard');
+        void this.router.navigateByUrl(back?.startsWith('/') && !back.startsWith('//') ? back : '/home');
       },
       error: () => {
         this.pending.set(false);

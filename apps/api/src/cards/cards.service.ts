@@ -14,6 +14,11 @@ const MAX_CHECKLIST_ITEMS = 100;
 /** Activity is a feed, not an audit export. */
 const ACTIVITY_PAGE = 50;
 
+const COMMENT_INCLUDE = {
+  author: { select: { email: true, displayName: true } },
+  attachments: { select: { id: true, path: true, originalName: true } },
+} as const;
+
 @Injectable()
 export class CardsService {
   constructor(
@@ -200,15 +205,22 @@ export class CardsService {
     return this.prisma.comment.findMany({
       where: { cardId },
       orderBy: { createdAt: 'asc' },
-      include: { author: { select: { email: true } } },
+      include: COMMENT_INCLUDE,
     });
   }
 
-  async addComment(userId: string, cardId: string, body: string) {
+  async addComment(userId: string, cardId: string, body: string, file?: Express.Multer.File) {
     const card = await this.findAccessible(userId, cardId);
     const comment = await this.prisma.comment.create({
-      data: { cardId, authorId: userId, body },
-      include: { author: { select: { email: true } } },
+      data: {
+        cardId,
+        authorId: userId,
+        body,
+        attachments: file && {
+          create: { cardId, uploaderId: userId, path: file.filename, originalName: file.originalname, size: file.size },
+        },
+      },
+      include: COMMENT_INCLUDE,
     });
 
     // Notify the people already on the card, plus anyone mentioned by email.
@@ -237,9 +249,14 @@ export class CardsService {
 
   async removeComment(userId: string, cardId: string, commentId: string) {
     const card = await this.findAccessible(userId, cardId);
-    // Only the author can delete their own comment.
-    const { count } = await this.prisma.comment.deleteMany({ where: { id: commentId, cardId, authorId: userId } });
-    if (count === 0) throw new BadRequestException('Comment not found');
+    // Only the author can delete their own comment. Its images go with it (cascade), files too.
+    const comment = await this.prisma.comment.findFirst({
+      where: { id: commentId, cardId, authorId: userId },
+      include: { attachments: { select: { path: true } } },
+    });
+    if (!comment) throw new BadRequestException('Comment not found');
+    await this.prisma.comment.delete({ where: { id: comment.id } });
+    await Promise.all(comment.attachments.map((a) => unlink(join(UPLOAD_DIR, a.path)).catch(() => {})));
     await this.events.record({
       type: 'COMMENT_DELETED',
       boardId: card.list.boardId,
@@ -254,15 +271,23 @@ export class CardsService {
     return this.prisma.timeEntry.findMany({
       where: { cardId },
       orderBy: { date: 'desc' },
-      include: { user: { select: { email: true } } },
+      include: { user: { select: { email: true, displayName: true } } },
     });
   }
 
-  async addTimeEntry(userId: string, cardId: string, input: UpsertTimeEntryInput) {
+  async addTimeEntry(userId: string, cardId: string, { userId: forUserId, ...input }: UpsertTimeEntryInput) {
     const card = await this.findAccessible(userId, cardId);
+    // Any member may log time on someone's behalf, but only for a member of this board.
+    const owner = forUserId ?? userId;
+    if (owner !== userId) {
+      const member = await this.prisma.boardMember.findUnique({
+        where: { boardId_userId: { boardId: card.list.boardId, userId: owner } },
+      });
+      if (!member) throw new BadRequestException('User is not a member of this board');
+    }
     const entry = await this.prisma.timeEntry.create({
-      data: { ...input, cardId, userId },
-      include: { user: { select: { email: true } } },
+      data: { ...input, cardId, userId: owner },
+      include: { user: { select: { email: true, displayName: true } } },
     });
     await this.events.record({
       type: 'TIME_LOGGED',
@@ -283,8 +308,9 @@ export class CardsService {
 
   async listAttachments(userId: string, cardId: string) {
     await this.findAccessible(userId, cardId);
+    // Card-level only: images posted with a comment come back with that comment.
     return this.prisma.attachment.findMany({
-      where: { cardId },
+      where: { cardId, commentId: null },
       orderBy: { createdAt: 'desc' },
       include: { uploader: { select: { email: true } } },
     });

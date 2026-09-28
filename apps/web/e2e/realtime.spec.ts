@@ -10,7 +10,7 @@ async function inviteSecondUser(owner: Page, browser: Browser, email: string) {
 
   const guestContext = await browser.newContext();
   const guest = await guestContext.newPage();
-  await register(guest, email);
+  await register(guest, email, 'Guest Driver');
   await guest.goto(new URL(link).pathname);
   await guest.getByRole('button', { name: /join/i }).click();
   await expect(guest).toHaveURL(/\/boards\/[^/?]+/);
@@ -58,7 +58,7 @@ test.describe('live collaboration', () => {
       .filter({ hasText: 'Fit the wet tyres' })
       .getByRole('button', { name: /member/i })
       .click();
-    await owner.getByRole('button', { name: new RegExp(guestEmail, 'i') }).click();
+    await owner.getByRole('button', { name: /Guest Driver/ }).click();
 
     const bell = guest.getByRole('button', { name: /activity/i });
     await expect(bell).toContainText('(1)', { timeout: 10_000 });
@@ -66,7 +66,7 @@ test.describe('live collaboration', () => {
     await bell.click();
     await guest.getByText(/assigned you to Fit the wet tyres/i).click();
     // Following the notification lands on the board with that card's modal already open.
-    await expect(guest.locator('#card-title')).toHaveValue('Fit the wet tyres');
+    await expect(guest.locator('.card-title-display')).toHaveText('Fit the wet tyres');
 
     await guestContext.close();
   });
@@ -81,7 +81,8 @@ test.describe('live collaboration', () => {
     const { guest, guestContext } = await inviteSecondUser(owner, browser, guestEmail);
 
     await listColumn(owner, 'Strategy').getByText('Undercut on lap 20').click();
-    await owner.getByPlaceholder(/write a comment/i).fill(`@${guestEmail} thoughts?`);
+    await owner.getByText('Insert your comment here').click();
+    await owner.locator('.new-comment [contenteditable]').fill(`@${guestEmail} thoughts?`);
     await owner.getByRole('button', { name: 'Comment' }).click();
 
     await expect(guest.getByRole('button', { name: /activity/i })).toContainText('(1)', {

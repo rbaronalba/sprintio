@@ -87,7 +87,7 @@ describe('AuthService', () => {
   afterEach(() => vi.useRealTimers());
 
   it('registers a user with a hashed password and issues tokens', async () => {
-    const result = await service.register('dev@sprintio.test', 'password123');
+    const result = await service.register('dev@sprintio.test', 'password123', 'Dev User');
 
     expect(result.accessToken).toBeTruthy();
     expect(result.refreshToken).toBeTruthy();
@@ -98,12 +98,12 @@ describe('AuthService', () => {
   });
 
   it('rejects registering the same email twice', async () => {
-    await service.register('dev@sprintio.test', 'password123');
-    await expect(service.register('dev@sprintio.test', 'password123')).rejects.toThrow();
+    await service.register('dev@sprintio.test', 'password123', 'Dev User');
+    await expect(service.register('dev@sprintio.test', 'password123', 'Dev User')).rejects.toThrow();
   });
 
   it('logs in with correct credentials and rejects wrong ones', async () => {
-    await service.register('dev@sprintio.test', 'password123');
+    await service.register('dev@sprintio.test', 'password123', 'Dev User');
 
     const login = await service.login('dev@sprintio.test', 'password123');
     expect(login.accessToken).toBeTruthy();
@@ -113,7 +113,7 @@ describe('AuthService', () => {
   });
 
   it('upgrades a legacy salt:hash password on login', async () => {
-    const { user } = await service.register('dev@sprintio.test', 'password123');
+    const { user } = await service.register('dev@sprintio.test', 'password123', 'Dev User');
     const legacy = `abcd:${scryptSync('password123', 'abcd', 64).toString('hex')}`;
     prisma.users.get(user.sub)!.passwordHash = legacy;
 
@@ -122,7 +122,7 @@ describe('AuthService', () => {
   });
 
   it('rotates the refresh token on every use', async () => {
-    const { refreshToken: firstToken } = await service.register('dev@sprintio.test', 'password123');
+    const { refreshToken: firstToken } = await service.register('dev@sprintio.test', 'password123', 'Dev User');
 
     const { refreshToken: secondToken } = await service.refresh(firstToken!);
     expect(secondToken).not.toBe(firstToken);
@@ -132,7 +132,7 @@ describe('AuthService', () => {
   });
 
   it('lets a tab that lost a concurrent refresh race through without a new cookie', async () => {
-    const { refreshToken: firstToken } = await service.register('dev@sprintio.test', 'password123');
+    const { refreshToken: firstToken } = await service.register('dev@sprintio.test', 'password123', 'Dev User');
     await service.refresh(firstToken!);
 
     const loser = await service.refresh(firstToken!);
@@ -141,7 +141,7 @@ describe('AuthService', () => {
   });
 
   it('kills the session when a rotated-out refresh token is reused after the grace window', async () => {
-    const { refreshToken: firstToken } = await service.register('dev@sprintio.test', 'password123');
+    const { refreshToken: firstToken } = await service.register('dev@sprintio.test', 'password123', 'Dev User');
     const { refreshToken: secondToken } = await service.refresh(firstToken!);
 
     vi.useFakeTimers({ toFake: ['Date'] });
@@ -152,7 +152,7 @@ describe('AuthService', () => {
   });
 
   it('logs out only the device holding the cookie', async () => {
-    const laptop = await service.register('dev@sprintio.test', 'password123');
+    const laptop = await service.register('dev@sprintio.test', 'password123', 'Dev User');
     const phone = await service.login('dev@sprintio.test', 'password123');
 
     await service.logout(laptop.user.sub, laptop.refreshToken!);

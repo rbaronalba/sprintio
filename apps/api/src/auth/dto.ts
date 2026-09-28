@@ -20,6 +20,18 @@ export function parseCredentials(body: unknown): Credentials {
   return { email: email.toLowerCase(), password };
 }
 
+/** Registration requires a first and last name — separate fields so neither is skippable. */
+export function parseRegisterName(body: unknown): string {
+  const { firstName, lastName } = (body ?? {}) as Record<string, unknown>;
+  const first = typeof firstName === 'string' ? firstName.trim() : '';
+  const last = typeof lastName === 'string' ? lastName.trim() : '';
+  if (!first || !last) throw new BadRequestException('First and last name are required');
+  if (first.length > 30 || last.length > 30) {
+    throw new BadRequestException('Name must be at most 30 characters');
+  }
+  return `${first} ${last}`;
+}
+
 export function parseDisplayName(body: unknown): string | null {
   const { displayName } = (body ?? {}) as Record<string, unknown>;
   if (displayName === null) return null;

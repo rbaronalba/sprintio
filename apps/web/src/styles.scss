@@ -115,15 +115,15 @@ a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 48px;
-  padding: 14px var(--space-md);
+  height: 36px;
+  padding: 8px var(--space-xs);
   border: 0;
   border-radius: var(--radius-md);
   font: inherit;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 700;
   line-height: 1;
-  letter-spacing: 1.4px;
+  letter-spacing: 1px;
   text-transform: uppercase;
   cursor: pointer;
   transition: background-color 120ms linear;
@@ -148,10 +148,14 @@ a {
   background: transparent;
   color: var(--ink);
   border: 1px solid currentColor;
-  padding: 13px 31px;
+  padding: 7px 15px;
 }
 
-input[type='text'] {
+/* Every text-like input and every select share one skin, so a date or number field
+   doesn't look like an unstyled browser widget next to a type=text one. Checkboxes,
+   radios and file inputs keep their native appearance — a radius on those is meaningless. */
+input:not([type='checkbox']):not([type='radio']):not([type='file']),
+select {
   height: 40px;
   padding: 8px var(--space-xs);
   background: var(--input-bg);
@@ -161,6 +165,14 @@ input[type='text'] {
   font: inherit;
 }
 
-input[type='text']:focus {
+input:not([type='checkbox']):not([type='radio']):not([type='file']):focus,
+select:focus {
   border-color: var(--ink);
+}
+
+/* Rendered/edited rich text (see boards/rich-text.ts); global because it styles innerHTML content. */
+.rich-out {
+  p { margin: 0; }
+  ul, ol { margin: 2px 0; padding-inline-start: 20px; }
+  code { padding: 0 4px; border-radius: var(--radius-sm); background: var(--canvas-elevated); font-size: 12px; }
 }

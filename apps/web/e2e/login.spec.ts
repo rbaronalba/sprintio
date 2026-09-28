@@ -10,13 +10,16 @@ test('a registered user can log in and reach the dashboard', async ({ page }) =>
   const email = uniqueEmail();
 
   await page.goto('/register');
+  await page.getByLabel('First name').fill('Test');
+  await page.getByLabel('Last name').fill('Driver');
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: 'Create account' }).click();
 
-  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page).toHaveURL(/\/home$/);
 
   // Log out so the login form itself is exercised, not just the signup redirect.
+  await page.getByRole('button', { name: 'Account' }).click();
   await page.getByRole('button', { name: 'Log out' }).click();
   await expect(page).toHaveURL(/\/login$/);
 
@@ -24,24 +27,26 @@ test('a registered user can log in and reach the dashboard', async ({ page }) =>
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
 
-  await expect(page).toHaveURL(/\/dashboard$/);
-  await expect(page.getByTestId('current-user')).toHaveText(email);
+  await expect(page).toHaveURL(/\/home$/);
+  await expect(page.getByTestId('current-user')).toHaveText('Test Driver');
 });
 
 test('the session survives a page reload via the refresh cookie', async ({ page }) => {
   const email = uniqueEmail();
 
   await page.goto('/register');
+  await page.getByLabel('First name').fill('Test');
+  await page.getByLabel('Last name').fill('Driver');
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: 'Create account' }).click();
-  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page).toHaveURL(/\/home$/);
 
   // The access token only lives in memory, so this proves the refresh cookie works.
   await page.reload();
 
-  await expect(page).toHaveURL(/\/dashboard$/);
-  await expect(page.getByTestId('current-user')).toHaveText(email);
+  await expect(page).toHaveURL(/\/home$/);
+  await expect(page.getByTestId('current-user')).toHaveText('Test Driver');
 });
 
 test('logging in with a wrong password shows an error and stays on the login page', async ({
@@ -57,7 +62,7 @@ test('logging in with a wrong password shows an error and stays on the login pag
 });
 
 test('the dashboard is not reachable without a session', async ({ page }) => {
-  await page.goto('/dashboard');
+  await page.goto('/home');
   // The guard keeps returnUrl on the query string so the login lands you back here.
-  await expect(page).toHaveURL(/\/login\?returnUrl=%2Fdashboard$/);
+  await expect(page).toHaveURL(/\/login\?returnUrl=%2Fhome$/);
 });

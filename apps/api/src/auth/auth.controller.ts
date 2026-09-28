@@ -12,7 +12,7 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { AuthService, REFRESH_TOKEN_TTL_MS } from './auth.service.js';
-import { parseCredentials, parseDisplayName } from './dto.js';
+import { parseCredentials, parseDisplayName, parseRegisterName } from './dto.js';
 import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
 import { EmailThrottlerGuard } from './guards/email-throttler.guard.js';
 import { CurrentUser } from './decorators/current-user.decorator.js';
@@ -40,7 +40,8 @@ export class AuthController {
   @Post('register')
   async register(@Body() body: unknown, @Res({ passthrough: true }) res: Response) {
     const { email, password } = parseCredentials(body);
-    const result = await this.auth.register(email, password);
+    const displayName = parseRegisterName(body);
+    const result = await this.auth.register(email, password, displayName);
     this.setRefreshCookie(res, result.refreshToken);
     return { accessToken: result.accessToken, user: result.user };
   }

@@ -19,22 +19,24 @@ enum Role {
 }
 
 model User {
-  id                    String        @id @default(cuid())
-  email                 String        @unique
-  displayName           String?
-  passwordHash          String
-  role                  Role          @default(DEVELOPER)
-  createdAt             DateTime      @default(now())
-  updatedAt             DateTime      @updatedAt
-  boards                Board[]
-  memberships           BoardMember[]
-  assignments           CardMember[]
-  comments              Comment[]
-  timeEntries           TimeEntry[]
-  attachments           Attachment[]
-  events                Event[]
-  notifications         Notification[]
-  sessions              Session[]
+  id               String            @id @default(cuid())
+  email            String            @unique
+  displayName      String?
+  passwordHash     String
+  role             Role              @default(DEVELOPER)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  boards           Board[]
+  workspaces       Workspace[]
+  memberships      BoardMember[]
+  assignments      CardMember[]
+  comments         Comment[]
+  timeEntries      TimeEntry[]
+  attachments      Attachment[]
+  events           Event[]
+  notifications    Notification[]
+  sessions         Session[]
+  workspaceMembers WorkspaceMember[]
 }
 
 /// One row per signed-in device. The refresh cookie names its row (`sid`) and must match
@@ -54,12 +56,42 @@ model Session {
   @@index([userId])
 }
 
+/// A named group of boards (e.g. one per department). Its members are made members of
+/// every board in it (BoardMember rows), so board-level access checks stay the only ones.
+model Workspace {
+  id          String            @id @default(cuid())
+  name        String
+  owner       User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId     String
+  inviteToken String?           @unique
+  boards      Board[]
+  members     WorkspaceMember[]
+  createdAt   DateTime          @default(now())
+
+  @@index([ownerId])
+}
+
+model WorkspaceMember {
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspaceId String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  joinedAt    DateTime  @default(now())
+
+  @@id([workspaceId, userId])
+  @@index([userId])
+}
+
 model Board {
   id          String        @id @default(cuid())
   title       String
   owner       User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   ownerId     String
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspaceId String
   inviteToken String?       @unique
+  /// '' (none), a palette color, or an /uploads/ image URL. See parseBackground.
+  background  String        @default("")
   lists       List[]
   members     BoardMember[]
   labels      Label[]
@@ -68,29 +100,35 @@ model Board {
   updatedAt   DateTime      @updatedAt
 
   @@index([ownerId])
+  @@index([workspaceId])
 }
 
 model List {
-  id        String   @id @default(cuid())
-  title     String
-  position  Float
-  board     Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  boardId   String
-  cards     Card[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(cuid())
+  title      String
+  position   Float
+  /// Same format as Board.background.
+  background String   @default("")
+  board      Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  boardId    String
+  cards      Card[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@index([boardId])
 }
 
 model Card {
-  id          String       @id @default(cuid())
+  id          String          @id @default(cuid())
   title       String
   description String?
   dueDate     DateTime?
-  dueDone     Boolean      @default(false)
+  dueDone     Boolean         @default(false)
+  // Soft-hidden from the board via the card's kebab menu. No restore UI yet — the row
+  // just stops showing up; add one when someone actually needs to find an archived card.
+  archived    Boolean         @default(false)
   position    Float
-  list        List         @relation(fields: [listId], references: [id], onDelete: Cascade)
+  list        List            @relation(fields: [listId], references: [id], onDelete: Cascade)
   listId      String
   assignees   CardMember[]
   labels      CardLabel[]
@@ -98,8 +136,8 @@ model Card {
   timeEntries TimeEntry[]
   attachments Attachment[]
   checklist   ChecklistItem[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
 
   @@index([listId])
 }
@@ -137,13 +175,14 @@ model CardLabel {
 }
 
 model Comment {
-  id        String   @id @default(cuid())
-  body      String
-  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
-  cardId    String
-  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  authorId  String
-  createdAt DateTime @default(now())
+  id          String       @id @default(cuid())
+  body        String
+  card        Card         @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  cardId      String
+  author      User         @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  authorId    String
+  attachments Attachment[]
+  createdAt   DateTime     @default(now())
 
   @@index([cardId])
 }
@@ -171,17 +210,25 @@ model Attachment {
   cardId       String
   uploader     User     @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
   uploaderId   String
+  /// Set when the image was posted with a comment; it is deleted with the comment.
+  comment      Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  commentId    String?
   createdAt    DateTime @default(now())
 
   @@index([cardId])
+  @@index([commentId])
 }
 
 model BoardMember {
-  board    Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  boardId  String
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId   String
-  joinedAt DateTime @default(now())
+  board        Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  boardId      String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String
+  joinedAt     DateTime  @default(now())
+  // Per-user: each member stars a board for themselves, not for the whole team.
+  starred      Boolean   @default(false)
+  // Per-user too: feeds "Recently viewed". Touched whenever the member opens the board.
+  lastViewedAt DateTime?
 
   @@id([boardId, userId])
   @@index([userId])
@@ -200,16 +247,16 @@ model CardMember {
 // Append-only activity log. One row feeds three readers: the live stream (SSE),
 // the per-card activity feed, and notification fan-out. See docs/adr/0003.
 model Event {
-  id      String @id @default(cuid())
+  id            String         @id @default(cuid())
   // Plain string, not an enum: a new event type shouldn't cost a migration.
-  type    String
-  board   Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  boardId String
+  type          String
+  board         Board          @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  boardId       String
   // Deliberately NOT a relation: "deleted card X" has to outlive card X.
   // `data` carries a title snapshot so the feed still renders after the card is gone.
-  cardId  String?
-  actor   User   @relation(fields: [actorId], references: [id], onDelete: Cascade)
-  actorId String
+  cardId        String?
+  actor         User           @relation(fields: [actorId], references: [id], onDelete: Cascade)
+  actorId       String
   // Display-only snapshot (titles, list names, label name). Never read back as state.
   data          Json
   createdAt     DateTime       @default(now())

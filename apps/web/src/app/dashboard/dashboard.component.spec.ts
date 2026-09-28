@@ -1,8 +1,8 @@
 import { Component } from '@angular/core';
-import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { Router, provideRouter } from '@angular/router';
+import { provideRouter } from '@angular/router';
 import { AuthService } from '../auth/auth.service';
 import { DashboardComponent } from './dashboard.component';
 
@@ -47,55 +47,54 @@ describe('DashboardComponent', () => {
 
   it('shows the signed-in user', () => {
     httpMock.expectOne('/boards').flush([]);
+    httpMock.expectOne('/workspaces').flush([]);
     fixture.detectChanges();
     const user: HTMLElement = fixture.nativeElement.querySelector('[data-testid="current-user"]');
     expect(user.textContent).toBe('dev@sprintio.test');
   });
 
-  it('prefers the display name over the email once one is set', () => {
-    httpMock.expectOne('/boards').flush([]);
-    fixture.componentInstance.saveProfile('  Rubén  ');
-    const req = httpMock.expectOne('/auth/profile');
-    expect(req.request.body).toEqual({ displayName: 'Rubén' });
-    req.flush({ sub: '1', email: 'dev@sprintio.test', role: 'DEVELOPER', displayName: 'Rubén' });
+  const board = (id: string, ownerId: string, workspaceId: string, lastViewedAt: string | null = null) =>
+    ({ id, title: `Board ${id}`, ownerId, workspaceId, lastViewedAt });
 
-    fixture.detectChanges();
-    const user: HTMLElement = fixture.nativeElement.querySelector('[data-testid="current-user"]');
-    expect(user.textContent).toBe('Rubén');
-  });
-
-  it('debounces search and ignores terms shorter than two characters', fakeAsync(() => {
-    httpMock.expectOne('/boards').flush([]);
-
-    fixture.componentInstance.search('c');
-    tick(300);
-    httpMock.expectNone((req) => req.url === '/search');
-
-    fixture.componentInstance.search('carburador');
-    tick(300);
-    const req = httpMock.expectOne((r) => r.url === '/search');
-    expect(req.request.params.get('q')).toBe('carburador');
-    req.flush([]);
-  }));
-
-  it('only offers deleting boards the user owns', () => {
-    const board = (id: string, ownerId: string) => ({ id, title: `Board ${id}`, ownerId });
-    httpMock.expectOne('/boards').flush([board('mine', '1'), board('shared', '9')]);
+  it('groups boards by workspace and only offers deleting boards the user owns', () => {
+    fixture.componentInstance.view.set('boards');
+    httpMock.expectOne('/boards').flush([board('mine', '1', 'w1'), board('shared', '9', 'w2')]);
+    httpMock.expectOne('/workspaces').flush([
+      { id: 'w1', name: 'Software', ownerId: '1', isMember: true, inviteToken: null },
+      { id: 'w2', name: 'Admin', ownerId: '9', isMember: false, inviteToken: null },
+    ]);
     fixture.detectChanges();
 
-    const rows: HTMLElement[] = Array.from(fixture.nativeElement.querySelectorAll('.board-tile:not(.board-tile--new)'));
-    expect(rows.length).toBe(2);
-    expect(rows[0].querySelector('button[aria-label="Remove board"]')).not.toBeNull();
-    expect(rows[1].querySelector('button[aria-label="Remove board"]')).toBeNull();
+    const groups: HTMLElement[] = Array.from(fixture.nativeElement.querySelectorAll('section.group'));
+    expect(groups.map((g) => g.getAttribute('aria-label'))).toEqual(['Software', 'Admin']);
+    expect(groups[0].querySelector('button[aria-label="Remove board"]')).not.toBeNull();
+    expect(groups[1].querySelector('button[aria-label="Remove board"]')).toBeNull();
+    // Only workspace members add boards; w2 is only visible through a directly shared board.
+    expect(groups[0].querySelector('.board-tile--new')).not.toBeNull();
+    expect(groups[1].querySelector('.board-tile--new')).toBeNull();
   });
 
-  it('logs out and returns to the login page', async () => {
-    httpMock.expectOne('/boards').flush([]);
-    fixture.componentInstance.logout();
-    httpMock.expectOne('/auth/logout').flush(null);
+  it('lists the three most recently viewed boards, newest first', () => {
+    httpMock.expectOne('/boards').flush([
+      board('a', '1', 'w1', '2026-09-01T00:00:00Z'),
+      board('b', '1', 'w1', '2026-09-04T00:00:00Z'),
+      board('never', '1', 'w1'),
+      board('c', '1', 'w1', '2026-09-03T00:00:00Z'),
+      board('d', '1', 'w1', '2026-09-02T00:00:00Z'),
+    ]);
+    httpMock.expectOne('/workspaces').flush([{ id: 'w1', name: 'Software', ownerId: '1', isMember: true, inviteToken: null }]);
+    expect(fixture.componentInstance.recent().map((b) => b.id)).toEqual(['b', 'c', 'd']);
+  });
 
-    await fixture.whenStable();
-    expect(TestBed.inject(AuthService).isAuthenticated()).toBe(false);
-    expect(TestBed.inject(Router).url).toBe('/login');
+  it('shows starred boards on Home', () => {
+    httpMock.expectOne('/boards').flush([
+      { ...board('fav', '1', 'w1'), starred: true },
+      { ...board('plain', '1', 'w1'), starred: false },
+    ]);
+    httpMock.expectOne('/workspaces').flush([{ id: 'w1', name: 'Software', ownerId: '1', isMember: true, inviteToken: null }]);
+    fixture.detectChanges();
+    const starred: HTMLElement = fixture.nativeElement.querySelector('section.starred');
+    expect(starred.textContent).toContain('Board fav');
+    expect(starred.textContent).not.toContain('Board plain');
   });
 });

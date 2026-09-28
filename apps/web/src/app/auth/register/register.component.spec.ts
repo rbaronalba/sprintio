@@ -24,6 +24,8 @@ describe('RegisterComponent', () => {
     httpMock = TestBed.inject(HttpTestingController);
     fixture = TestBed.createComponent(RegisterComponent);
     fixture.componentInstance.form.setValue({
+      firstName: 'Ada',
+      lastName: 'Lovelace',
       email: 'dev@sprintio.test',
       password: 'password123',
     });
@@ -35,11 +37,11 @@ describe('RegisterComponent', () => {
     fixture.componentInstance.submit();
     httpMock.expectOne('/auth/register').flush({
       accessToken: 'token-1',
-      user: { sub: '1', email: 'dev@sprintio.test', role: 'DEVELOPER' },
+      user: { sub: '1', email: 'dev@sprintio.test', role: 'DEVELOPER', displayName: 'Ada Lovelace' },
     });
 
     await fixture.whenStable();
-    expect(TestBed.inject(Router).url).toBe('/dashboard');
+    expect(TestBed.inject(Router).url).toBe('/home');
   });
 
   it('tells the user when the email is already registered', async () => {

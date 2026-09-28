@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { memberOf } from './access.js';
 import { EventsService } from '../events/events.service.js';
 import type { UpsertLabelInput } from './dto.js';
+import { removeUpload } from '../cards/uploads.js';
 
 const MAX_BOARDS_PER_USER = 100;
 const MAX_MEMBERS_PER_BOARD = 20;
@@ -19,22 +20,56 @@ export class BoardsService {
     private readonly events: EventsService,
   ) {}
 
-  list(userId: string) {
-    return this.prisma.board.findMany({
+  /** Every board the user belongs to, with their own star and last-viewed stamp flattened in. */
+  async list(userId: string) {
+    const boards = await this.prisma.board.findMany({
       where: memberOf(userId),
       orderBy: { createdAt: 'desc' },
       omit: { inviteToken: true },
+      include: { members: { where: { userId }, select: { starred: true, lastViewedAt: true } } },
     });
+    return boards.map(({ members: [me], ...board }) => ({ ...board, ...me }));
   }
 
-  async create(ownerId: string, title: string) {
+  /**
+   * The board lands in a workspace the creator belongs to (their oldest owned one when none
+   * is named, created on first use), and every member of that workspace joins it.
+   */
+  async create(ownerId: string, title: string, workspaceId?: string) {
     if ((await this.prisma.board.count({ where: { ownerId } })) >= MAX_BOARDS_PER_USER) {
       throw new BadRequestException('Board limit reached');
     }
-    return this.prisma.board.create({
-      data: { title, ownerId, members: { create: { userId: ownerId } } },
+    const ws = workspaceId
+      ? await this.prisma.workspace.findFirst({ where: { id: workspaceId, members: { some: { userId: ownerId } } } })
+      : ((await this.prisma.workspace.findFirst({ where: { ownerId }, orderBy: { createdAt: 'asc' } })) ??
+        (await this.prisma.workspace.create({
+          data: { name: 'My workspace', ownerId, members: { create: { userId: ownerId } } },
+        })));
+    if (!ws) throw new NotFoundException('Workspace not found');
+
+    const others = await this.prisma.workspaceMember.findMany({
+      where: { workspaceId: ws.id, userId: { not: ownerId } },
+      select: { userId: true },
+    });
+    const board = await this.prisma.board.create({
+      data: {
+        title,
+        ownerId,
+        workspaceId: ws.id,
+        members: { create: [{ userId: ownerId, lastViewedAt: new Date() }, ...others] },
+      },
       omit: { inviteToken: true },
     });
+    if (others.length) {
+      // Lets the other members' open streams pick up the new board (see EventsService).
+      await this.events.record({
+        type: 'BOARD_CREATED',
+        boardId: board.id,
+        actorId: ownerId,
+        data: { boardTitle: title, userIds: others.map((m) => m.userId) },
+      });
+    }
+    return board;
   }
 
   // Any member can read a board; only the owner gets to see the invite token.
@@ -42,19 +77,41 @@ export class BoardsService {
     const board = await this.prisma.board.findFirst({
       where: { id, ...memberOf(userId) },
       include: {
-        members: { include: { user: { select: { email: true } } }, orderBy: { joinedAt: 'asc' } },
+        members: {
+          include: { user: { select: { email: true, displayName: true } } },
+          orderBy: { joinedAt: 'asc' },
+        },
         labels: { orderBy: { name: 'asc' } },
       },
     });
     if (!board) throw new NotFoundException('Board not found');
+    await this.prisma.boardMember.update({
+      where: { boardId_userId: { boardId: id, userId } },
+      data: { lastViewedAt: new Date() },
+    });
     return {
       id: board.id,
       title: board.title,
       ownerId: board.ownerId,
       inviteToken: board.ownerId === userId ? board.inviteToken : null,
-      members: board.members.map((m) => ({ userId: m.userId, email: m.user.email })),
+      background: board.background,
+      starred: board.members.find((m) => m.userId === userId)?.starred ?? false,
+      members: board.members.map((m) => ({
+        userId: m.userId,
+        email: m.user.email,
+        displayName: m.user.displayName,
+      })),
       labels: board.labels,
     };
+  }
+
+  async setStarred(userId: string, boardId: string, starred: boolean) {
+    const { count } = await this.prisma.boardMember.updateMany({
+      where: { boardId, userId },
+      data: { starred },
+    });
+    if (!count) throw new NotFoundException('Board not found');
+    return { starred };
   }
 
   async findOwned(ownerId: string, id: string) {
@@ -64,8 +121,25 @@ export class BoardsService {
   }
 
   async update(ownerId: string, id: string, title: string) {
-    await this.findOwned(ownerId, id);
-    return this.prisma.board.update({ where: { id }, data: { title }, omit: { inviteToken: true } });
+    const board = await this.findOwned(ownerId, id);
+    const updated = await this.prisma.board.update({ where: { id }, data: { title }, omit: { inviteToken: true } });
+    if (title !== board.title) {
+      await this.events.record({ type: 'BOARD_RENAMED', boardId: id, actorId: ownerId, data: { from: board.title, boardTitle: title } });
+    }
+    return updated;
+  }
+
+  /** Any member, like Trello. A just-uploaded image is deleted again if access fails. */
+  async setBackground(userId: string, id: string, background: string) {
+    const board = await this.prisma.board.findFirst({ where: { id, ...memberOf(userId) } });
+    if (!board) {
+      await removeUpload(background);
+      throw new NotFoundException('Board not found');
+    }
+    await this.prisma.board.update({ where: { id }, data: { background } });
+    await removeUpload(board.background);
+    await this.events.record({ type: 'BACKGROUND_CHANGED', boardId: id, actorId: userId, data: { title: board.title } });
+    return { background };
   }
 
   async remove(ownerId: string, id: string) {
@@ -190,6 +264,7 @@ export class BoardsService {
     if (query.length < 2) return [];
     const cards = await this.prisma.card.findMany({
       where: {
+        archived: false,
         list: { board: memberOf(userId) },
         OR: [
           { title: { contains: query, mode: 'insensitive' } },

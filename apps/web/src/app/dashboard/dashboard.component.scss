@@ -4,144 +4,345 @@
   background: var(--canvas);
 }
 
-.top-nav {
+.layout {
   display: flex;
-  align-items: center;
   gap: var(--space-md);
-  height: 64px;
-  padding: 0 var(--space-lg);
-  border-bottom: 1px solid var(--hairline);
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: var(--space-md) var(--space-sm);
 }
 
-.mark {
-  display: inline-flex;
+/* ---- Sidebar ---- */
+
+.sidebar {
+  flex: none;
+  width: 256px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-item {
+  display: flex;
   align-items: center;
   gap: var(--space-xxs);
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 1.4px;
-  text-transform: uppercase;
-}
-
-/* Stands in for the Cavallino mark — the brand's other sanctioned red. */
-.cavallino {
-  width: 10px;
-  height: 18px;
-  background: var(--primary);
-  clip-path: polygon(50% 0, 100% 38%, 78% 100%, 22% 100%, 0 38%);
-}
-
-.nav-links {
-  display: flex;
-  gap: var(--space-sm);
-  margin-inline-start: var(--space-md);
-}
-
-.nav-link {
-  color: var(--body);
+  padding: var(--space-xxs) var(--space-xs);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  font-size: 14px;
   text-decoration: none;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.65px;
-  text-transform: uppercase;
-  padding: 15px 0;
-  transition: color 120ms linear;
 }
 
-.nav-link:hover {
+.nav-item:hover {
+  background: var(--surface-card);
+}
+
+.nav-item.active {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.nav-icon {
+  width: 16px;
+  text-align: center;
+}
+
+.nav-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: var(--space-sm) 0 var(--space-xxxs);
+  padding: var(--space-xxs) var(--space-xs) 0;
+  border-top: 1px solid var(--hairline);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.nav-heading .icon-btn {
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.nav-heading .icon-btn:hover {
   color: var(--ink);
 }
 
-.nav-utils {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-  margin-inline-start: auto;
+.nav-note {
+  margin: var(--space-xxxs) var(--space-xs);
+  color: var(--muted);
+  font-size: 13px;
 }
 
-.nav-utils .btn {
-  height: 36px;
-  padding: 8px var(--space-xs);
-  font-size: 12px;
+.ws-mark {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ws-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 main {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: var(--space-xxl) var(--space-lg);
+  flex: 1;
+  min-width: 0;
 }
 
-.kicker {
-  color: var(--primary);
+/* ---- Home ---- */
+
+.home {
+  display: flex;
+  gap: var(--space-md);
+  align-items: flex-start;
+}
+
+.home-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.greeting {
+  align-self: stretch;
   margin: 0 0 var(--space-xs);
+  color: var(--body);
+  text-align: center;
 }
 
-.hero h1 {
-  font-size: clamp(56px, 8vw, 80px);
-  letter-spacing: -1.6px;
-  line-height: 1.05;
+.greeting strong {
+  color: var(--ink);
+  font-weight: 600;
 }
 
-.signed-in {
+.welcome {
+  width: min(550px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
+  padding-bottom: var(--space-sm);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: var(--surface-card);
+  text-align: center;
+  overflow: hidden;
+}
+
+.welcome h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.welcome p {
+  margin: 0;
+  padding: 0 var(--space-sm);
+  color: var(--body);
+  font-size: 14px;
+}
+
+.welcome .btn {
+  height: 36px;
+  padding: 8px var(--space-xs);
+  font-size: 13px;
+}
+
+/* A small board drawn in CSS: three lists of cards on the brand color. */
+.welcome-art {
+  align-self: stretch;
+  display: flex;
+  justify-content: center;
+  padding-top: var(--space-xs);
+  background: color-mix(in srgb, var(--primary) 18%, transparent);
+}
+
+.art-board {
+  display: flex;
+  gap: 8px;
+  width: 250px;
+  height: 120px;
+  padding: 24px 10px 0;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  background: var(--primary);
+}
+
+.art-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-self: flex-start;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.art-list i {
+  height: 12px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.home-side {
+  flex: none;
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxxs);
+}
+
+.side-heading {
+  display: flex;
+  gap: var(--space-xxs);
+  margin: var(--space-xs) 0 var(--space-xxxs);
+  color: var(--body);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.side-heading:first-child {
+  margin-top: 0;
+}
+
+.side-row {
   display: flex;
   align-items: center;
   gap: var(--space-xxs);
-  flex-wrap: wrap;
-  margin: var(--space-sm) 0 0;
-  color: var(--body);
-}
-
-.signed-in strong {
+  width: 100%;
+  padding: var(--space-xxxs);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: none;
   color: var(--ink);
-  font-weight: 500;
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
 }
 
-.role {
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 1.1px;
-  text-transform: uppercase;
+.side-row:hover {
+  background: var(--surface-card);
 }
 
-.role::before {
-  content: '/';
-  margin-inline-end: var(--space-xxs);
+.side-create {
+  border-color: var(--hairline);
 }
 
-.specs {
+.thumb {
+  flex: none;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-lg);
-  margin-top: var(--space-super);
-  border-top: 1px solid var(--hairline);
+  place-items: center;
+  width: 40px;
+  height: 32px;
+  border-radius: var(--radius-sm);
 }
 
-.spec {
-  padding: var(--space-sm) 0;
+.thumb-plus {
+  background: var(--surface-card);
+  color: var(--body);
+  font-size: 18px;
 }
 
-.spec-value {
-  margin: 0;
-  font-size: 80px;
+.side-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.side-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.side-sub {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* ---- Boards ---- */
+
+.group + .group,
+.all-title {
+  margin-top: var(--space-md);
+}
+
+.all-title {
+  color: var(--muted);
+}
+
+.group-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  margin: 0 0 var(--space-xs);
+  font-size: 16px;
   font-weight: 700;
-  line-height: 1;
-  letter-spacing: -1.6px;
+}
+
+.ws-rename {
+  height: 32px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.ws-actions {
+  display: flex;
+  gap: var(--space-xxxs);
+  margin-left: auto;
+}
+
+.text-btn {
+  padding: 2px var(--space-xxs);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--body);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.text-btn:hover {
+  background: var(--surface-card);
   color: var(--ink);
 }
 
-/* Rosso Corsa on the lead figure only — the race-position treatment. */
-.spec-value--accent {
+.text-btn--danger:hover {
   color: var(--primary);
 }
 
-.spec-label {
-  margin: var(--space-xxs) 0 0;
-  color: var(--muted);
+.starred {
+  align-self: stretch;
+  margin-bottom: var(--space-md);
 }
 
-.boards {
-  margin-top: var(--space-xl);
+.star {
+  color: #f5cd47;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  color: var(--body);
 }
 
 .board-grid {
@@ -201,6 +402,37 @@ main {
   color: var(--primary);
 }
 
+.board-tile a.has-bg {
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+}
+
+/* Bottom-right like Trello's: shows on hover, stays visible once starred. */
+.board-tile .star-btn {
+  position: absolute;
+  right: var(--space-xxs);
+  bottom: var(--space-xxs);
+  display: inline-flex;
+  padding: 4px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0;
+}
+
+.board-tile:hover .star-btn,
+.board-tile .star-btn:focus-visible,
+.board-tile .star-btn.on {
+  opacity: 1;
+}
+
+.board-tile .star-btn:hover,
+.board-tile .star-btn.on {
+  color: #f5cd47;
+}
+
 .board-tile--new {
   background: none;
   border-style: dashed;
@@ -249,25 +481,19 @@ main {
 }
 
 @media (max-width: 900px) {
-  .top-nav {
-    padding: 0 var(--space-md);
+  .layout {
+    flex-direction: column;
+    padding: var(--space-sm) var(--space-xs);
   }
 
-  .nav-links {
-    display: none;
+  .sidebar,
+  .home-side {
+    width: auto;
   }
 
-  main {
-    padding: var(--space-lg) var(--space-md);
-  }
-
-  .specs {
-    grid-template-columns: 1fr;
-    gap: 0;
-  }
-
-  .specs .spec + .spec {
-    border-top: 1px solid var(--hairline);
+  .home {
+    flex-direction: column;
+    align-items: stretch;
   }
 }
 
@@ -304,88 +530,57 @@ main {
   padding: 7px calc(var(--space-sm) - 1px);
 }
 
-/* Global card search: results drop out of the nav as an overlay, so the grid
-   underneath keeps its place instead of being replaced by a results view. */
-.search {
-  position: relative;
-}
-
-.search-input {
-  background: var(--input-bg);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-md);
-  color: var(--ink);
-  font: inherit;
-  height: 40px;
-  padding: 0 var(--space-xs);
-  width: min(240px, 40vw);
-
-  &:focus-visible {
-    border-color: var(--primary);
-    outline: none;
-  }
-}
-
-.search-results {
-  background: var(--canvas-elevated);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-lg);
-  left: 0;
-  list-style: none;
+.confirm-dialog input {
+  width: 100%;
   margin: var(--space-xxxs) 0 0;
-  max-height: 60vh;
-  overflow-y: auto;
+}
+
+.members-dialog {
+  width: min(480px, 92vw);
+}
+
+.confirm-dialog .dialog-note {
+  margin: var(--space-xxs) 0;
+  color: var(--body);
+  font-size: 13px;
+}
+
+.member-list {
+  list-style: none;
+  margin: var(--space-sm) 0 0;
   padding: 0;
-  position: absolute;
-  top: 100%;
-  width: min(360px, 90vw);
-  z-index: 20;
-
-  li + li {
-    border-top: 1px solid var(--hairline);
-  }
-
-  button {
-    background: none;
-    border: none;
-    color: inherit;
-    cursor: pointer;
-    display: flex;
-    flex-direction: column;
-    font: inherit;
-    gap: 2px;
-    padding: var(--space-xs);
-    text-align: left;
-    width: 100%;
-
-    &:hover {
-      background: var(--surface-card);
-    }
-  }
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
 }
 
-.hit-title {
-  overflow-wrap: anywhere;
+.member-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xxs);
 }
 
-.hit-where {
+.member-avatar {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.member-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Plain text, not a badge (project rule). */
+.member-role {
   color: var(--muted);
   font-size: 12px;
-}
-
-.profile-email {
-  color: var(--muted);
-  margin: var(--space-xxxs) 0 var(--space-xs);
-}
-
-#display-name {
-  background: var(--input-bg);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-md);
-  color: var(--ink);
-  font: inherit;
-  height: 40px;
-  margin-top: var(--space-xxxs);
-  padding: 0 var(--space-xs);
-  width: 100%;
 }

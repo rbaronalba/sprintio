@@ -23,7 +23,10 @@ export type EventType =
   | 'LIST_UPDATED'
   | 'LIST_DELETED'
   | 'MEMBER_JOINED'
-  | 'MEMBER_REMOVED';
+  | 'BOARD_CREATED'
+  | 'MEMBER_REMOVED'
+  | 'BACKGROUND_CHANGED'
+  | 'BOARD_RENAMED';
 
 export interface RecordInput {
   type: EventType;
@@ -105,7 +108,8 @@ export class EventsService {
    * The live stream for one user, filtered to the boards they belong to.
    *
    * Membership is read once per connection, then kept current from the bus: a board
-   * joined mid-stream is added on its MEMBER_JOINED, and a removal drops the board on
+   * joined mid-stream is added on its MEMBER_JOINED (or on a BOARD_CREATED in a workspace
+   * they belong to, which lists them in `data.userIds`), and a removal drops the board on
    * its MEMBER_REMOVED — after delivering that one event, so the client learns why.
    */
   streamFor(userId: string): Observable<StreamMessage> {
@@ -115,6 +119,9 @@ export class EventsService {
         return this.bus.pipe(
           filter((message) => {
             if (message.type === 'MEMBER_JOINED' && message.actorId === userId) {
+              boards.add(message.boardId);
+            }
+            if (message.type === 'BOARD_CREATED' && (message.data.userIds as string[] | undefined)?.includes(userId)) {
               boards.add(message.boardId);
             }
             if (message.type === 'MEMBER_REMOVED' && message.data.userId === userId) {

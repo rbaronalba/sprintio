@@ -11,12 +11,16 @@ export function uniqueEmail(tag: string): string {
 
 export const PASSWORD = 'e2e-password-123';
 
-export async function register(page: Page, email: string): Promise<void> {
+/** `name` is "First Last": the member picker shows people by name, so tests pick by it. */
+export async function register(page: Page, email: string, name = 'Test Driver'): Promise<void> {
+  const [first, last] = name.split(' ');
   await page.goto('/register');
+  await page.locator('#firstName').fill(first);
+  await page.locator('#lastName').fill(last);
   await page.locator('#email').fill(email);
   await page.locator('#password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Create account' }).click();
-  await expect(page).toHaveURL(/\/dashboard/);
+  await expect(page).toHaveURL(/\/home/);
 }
 
 export async function login(page: Page, email: string): Promise<void> {
@@ -24,18 +28,14 @@ export async function login(page: Page, email: string): Promise<void> {
   await page.locator('#email').fill(email);
   await page.locator('#password').fill(PASSWORD);
   await page.getByRole('button', { name: /sign in/i }).click();
-  await expect(page).toHaveURL(/\/dashboard/);
+  await expect(page).toHaveURL(/\/home/);
 }
 
-/** Creates a board from the dashboard and opens it. Returns its id from the URL. */
+/** Creates a board from the header's Create dialog, which opens it. Returns its id from the URL. */
 export async function createBoard(page: Page, title: string): Promise<string> {
-  await page.getByRole('button', { name: '+ Create new board' }).click();
+  await page.getByRole('button', { name: 'Create board' }).click();
   await page.getByLabel('Board title').fill(title);
   await page.getByRole('button', { name: 'Create', exact: true }).click();
-
-  const link = page.getByRole('link', { name: title });
-  await expect(link).toBeVisible();
-  await link.click();
   await expect(page).toHaveURL(/\/boards\/[^/]+$/);
   return new URL(page.url()).pathname.split('/').pop()!;
 }

@@ -1,143 +1,268 @@
-<header class="top-nav">
-  <span class="mark">
-    <span class="cavallino" aria-hidden="true"></span>
-    Sprintio
-  </span>
-  <nav class="nav-links" aria-label="Main">
-    <a routerLink="/dashboard" class="nav-link">Boards</a>
-    <a href="#" class="nav-link">Sprints</a>
-    <a href="#" class="nav-link">Team</a>
-  </nav>
-  <div class="nav-utils">
-    <div class="search">
-      <input
-        type="search"
-        class="search-input"
-        placeholder="Search cards…"
-        aria-label="Search cards across all boards"
-        [value]="searchTerm()"
-        (input)="search($any($event.target).value)"
-        (keydown.escape)="clearSearch()"
-      />
-      @if (searchHits().length > 0) {
-        <ul class="search-results" role="listbox" aria-label="Search results">
-          @for (hit of searchHits(); track hit.cardId) {
-            <li>
-              <button type="button" (click)="openHit(hit)">
-                <span class="hit-title">{{ hit.title }}</span>
-                <span class="hit-where">{{ hit.boardTitle }} · {{ hit.listTitle }}</span>
-              </button>
-            </li>
-          }
-        </ul>
-      }
+<app-header />
+
+<ng-template #tile let-b>
+  <a [routerLink]="['/boards', b.id]" [class.has-bg]="b.background" [style]="bgStyle(b.background)">{{ b.title }}</a>
+  <button
+    type="button"
+    class="star-btn"
+    [class.on]="b.starred"
+    [attr.aria-pressed]="b.starred"
+    [attr.aria-label]="b.starred ? 'Unstar board' : 'Star board'"
+    [title]="b.starred ? 'Unstar board' : 'Star board'"
+    (click)="toggleStar(b)"
+  >
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" [attr.fill-opacity]="b.starred ? 1 : 0" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" d="M8 1.6l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.4l-3.8 2 .7-4.3-3.1-3 4.3-.6z" /></svg>
+  </button>
+</ng-template>
+
+<div class="layout">
+  <nav class="sidebar" aria-label="Main">
+    <a
+      routerLink="/boards"
+      routerLinkActive="active"
+      class="nav-item"
+    >
+      <span class="nav-icon" aria-hidden="true">&#9638;</span> Boards
+    </a>
+    <a
+      routerLink="/home"
+      routerLinkActive="active"
+      [routerLinkActiveOptions]="{ exact: true }"
+      class="nav-item"
+    >
+      <span class="nav-icon" aria-hidden="true">&#8962;</span> Home
+    </a>
+
+    <div class="nav-heading">
+      <span>Workspaces</span>
+      <button type="button" class="icon-btn" aria-label="Create workspace" title="Create workspace" (click)="openCreateWorkspace()">
+        +
+      </button>
     </div>
-    <app-notification-bell />
-    <app-theme-toggle />
-    <button type="button" class="btn btn-outline" (click)="openProfile()">Profile</button>
-    <button type="button" class="btn btn-outline" (click)="logout()">Log out</button>
-  </div>
-</header>
-
-<main>
-  <section class="hero">
-    <p class="label-caps kicker">Current sprint</p>
-    <h1>Paddock.</h1>
-    @if (auth.currentUser(); as user) {
-      <p class="signed-in">
-        Signed in as <strong data-testid="current-user">{{ user.displayName || user.email }}</strong>
-        <span class="role">{{ user.role }}</span>
-      </p>
+    @for (w of workspaces(); track w.id) {
+      <a [routerLink]="['/w', w.id]" routerLinkActive="active" class="nav-item">
+        <span class="ws-mark" [style]="avatarStyle(w.id)" aria-hidden="true">{{ w.name.charAt(0).toUpperCase() }}</span>
+        <span class="ws-name">{{ w.name }}</span>
+      </a>
+    } @empty {
+      <p class="nav-note">No workspaces yet.</p>
     }
-  </section>
+  </nav>
 
-  <section class="boards" aria-label="Boards">
-    <ul class="board-grid">
-      @for (board of boards(); track board.id) {
-        <li class="board-tile">
-          <a [routerLink]="['/boards', board.id]">{{ board.title }}</a>
-          @if (board.ownerId === auth.currentUser()?.sub) {
-            <button
-              type="button"
-              class="icon-btn"
-              (click)="askDelete(board)"
-              aria-label="Remove board"
-            >
-              &times;
-            </button>
+  <main>
+    @if (view() === 'home') {
+      <div class="home">
+        <section class="home-main">
+          @if (auth.currentUser(); as user) {
+            <p class="greeting">Welcome back, <strong data-testid="current-user">{{ user.displayName || user.email }}</strong></p>
+          }
+          @if (starred().length) {
+            <section class="starred" aria-label="Starred boards">
+              <h2 class="group-title"><span class="star" aria-hidden="true">&#9733;</span> Starred boards</h2>
+              <ul class="board-grid">
+                @for (b of starred(); track b.id) {
+              <li class="board-tile"><ng-container *ngTemplateOutlet="tile; context: { $implicit: b }" /></li>
+                }
+              </ul>
+            </section>
+          }
+          <div class="welcome">
+            <div class="welcome-art" aria-hidden="true">
+              <div class="art-board">
+                <span class="art-list"><i></i><i></i><i></i></span>
+                <span class="art-list"><i></i><i></i></span>
+                <span class="art-list"><i></i></span>
+              </div>
+            </div>
+            <h2>Organize anything</h2>
+            <p>Put everything in one place and start moving things forward with your first Sprintio board!</p>
+            <button type="button" class="btn btn-primary" (click)="openCreateBoard()">Create a Workspace board</button>
+          </div>
+        </section>
+
+        <aside class="home-side">
+          <p class="side-heading"><span aria-hidden="true">&#9719;</span> Recently viewed</p>
+          @for (b of recent(); track b.id) {
+            <a class="side-row" [routerLink]="['/boards', b.id]">
+              <span class="thumb" [style]="avatarStyle(b.id)" aria-hidden="true"></span>
+              <span class="side-text">
+                <span class="side-title">{{ b.title }}</span>
+                <span class="side-sub">{{ workspaceName(b.workspaceId) }}</span>
+              </span>
+            </a>
+          } @empty {
+            <p class="nav-note">Boards you open show up here.</p>
+          }
+
+          <p class="side-heading">Links</p>
+          <button type="button" class="side-row side-create" (click)="openCreateBoard()">
+            <span class="thumb thumb-plus" aria-hidden="true">+</span>
+            <span class="side-title">Create a new board</span>
+          </button>
+        </aside>
+      </div>
+    } @else {
+      @if (!workspaceId() && recent().length) {
+        <section class="group" aria-label="Recently viewed">
+          <h2 class="group-title"><span aria-hidden="true">&#9719;</span> Recently viewed</h2>
+          <ul class="board-grid">
+            @for (b of recent(); track b.id) {
+              <li class="board-tile"><ng-container *ngTemplateOutlet="tile; context: { $implicit: b }" /></li>
+            }
+          </ul>
+        </section>
+      }
+
+      @if (!workspaceId()) {
+        <h2 class="label-caps all-title">Your workspaces</h2>
+      }
+      @for (s of sections(); track s.workspace.id) {
+        <section class="group" [attr.aria-label]="s.workspace.name">
+          <h3 class="group-title">
+            <span class="ws-mark" [style]="avatarStyle(s.workspace.id)" aria-hidden="true">{{ s.workspace.name.charAt(0).toUpperCase() }}</span>
+            @if (renamingWs() === s.workspace.id) {
+              <input
+                #wsRename
+                type="text"
+                class="ws-rename"
+                maxlength="60"
+                aria-label="Workspace name"
+                autofocus
+                [value]="s.workspace.name"
+                (keydown.enter)="renameWorkspace(s.workspace, wsRename.value)"
+                (keydown.escape)="renamingWs.set(null)"
+                (blur)="renameWorkspace(s.workspace, wsRename.value)"
+              />
+            } @else {
+              <span>{{ s.workspace.name }}</span>
+            }
+            @if (renamingWs() !== s.workspace.id) {
+              <span class="ws-actions">
+                @if (s.workspace.isMember) {
+                  <button type="button" class="text-btn" (click)="openMembers(s.workspace)">Members</button>
+                }
+                @if (isOwner(s.workspace)) {
+                  <button type="button" class="text-btn" (click)="renamingWs.set(s.workspace.id)">Rename</button>
+                  <button type="button" class="text-btn text-btn--danger" (click)="askDeleteWorkspace(s.workspace)">Delete</button>
+                }
+              </span>
+            }
+          </h3>
+          <ul class="board-grid">
+            @for (board of s.boards; track board.id) {
+              <li class="board-tile">
+                <ng-container *ngTemplateOutlet="tile; context: { $implicit: board }" />
+                @if (board.ownerId === auth.currentUser()?.sub) {
+                  <button type="button" class="icon-btn" (click)="askDelete(board)" aria-label="Remove board">
+                    &times;
+                  </button>
+                }
+              </li>
+            }
+            @if (s.workspace.isMember) {
+              <li class="board-tile board-tile--new">
+                @if (creatingIn() === s.workspace.id) {
+                  <form [formGroup]="form" (ngSubmit)="createBoard(s.workspace.id)">
+                    <input
+                      type="text"
+                      formControlName="title"
+                      placeholder="Board title"
+                      aria-label="Board title"
+                      autofocus
+                      (keydown.escape)="creatingIn.set(null)"
+                    />
+                    <div class="new-actions">
+                      <button type="submit" class="btn btn-primary" [disabled]="form.invalid || pending()">
+                        Create
+                      </button>
+                      <button type="button" class="icon-btn" aria-label="Cancel" (click)="creatingIn.set(null)">
+                        &times;
+                      </button>
+                    </div>
+                  </form>
+                } @else {
+                  <button type="button" class="new-trigger" (click)="startCreate(s.workspace.id)">
+                    + Create new board
+                  </button>
+                }
+              </li>
+            }
+          </ul>
+        </section>
+      } @empty {
+        <div class="empty">
+          <p>You don't have any workspaces yet. A workspace groups boards, for example one per department.</p>
+          <button type="button" class="btn btn-primary" (click)="openCreateWorkspace()">Create a workspace</button>
+        </div>
+      }
+    }
+  </main>
+</div>
+
+<dialog #workspaceDialog class="confirm-dialog">
+  <form (submit)="$event.preventDefault(); createWorkspace(wsName)">
+    <p class="label-caps">Create workspace</p>
+    <label class="label-caps" for="workspace-name">Workspace name</label>
+    <input #wsName id="workspace-name" type="text" maxlength="60" placeholder="e.g. Software" autocomplete="off" />
+    <div class="dialog-actions">
+      <button type="submit" class="btn btn-primary">Create</button>
+      <button type="button" class="btn btn-outline" (click)="workspaceDialog.close()">Cancel</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog #membersDialog class="confirm-dialog members-dialog">
+  @if (membersOf(); as w) {
+    <p class="label-caps">{{ w.name }} members</p>
+    @if (isOwner(w)) {
+      @if (shareLink(); as link) {
+        <p class="dialog-note">
+          Anyone signed in who opens this link joins the workspace and every board in it. Stopping
+          sharing kills the link; people who already joined keep access.
+        </p>
+        <input #linkInput type="text" readonly [value]="link" aria-label="Workspace invitation link" />
+        <div class="dialog-actions">
+          <button type="button" class="btn btn-primary" (click)="copyLink(linkInput)">Copy link</button>
+          <button type="button" class="btn btn-outline" (click)="stopSharing()">Stop sharing</button>
+        </div>
+      } @else {
+        <p class="dialog-note">Invite people to every board in this workspace with a link.</p>
+        <div class="dialog-actions">
+          <button type="button" class="btn btn-primary" (click)="createInvite()">Create invite link</button>
+        </div>
+      }
+    }
+    <ul class="member-list">
+      @for (m of members(); track m.userId) {
+        <li>
+          <span class="member-avatar" [style]="avatarStyle(m.userId)" aria-hidden="true">{{ initials(m.displayName, m.email) }}</span>
+          <span class="member-name" [title]="m.email">{{ m.displayName || m.email }}</span>
+          @if (m.userId === w.ownerId) {
+            <span class="member-role">Owner</span>
+          } @else if (m.userId === auth.currentUser()?.sub) {
+            <button type="button" class="text-btn text-btn--danger" (click)="askRemoveMember(m)">Leave</button>
+          } @else if (isOwner(w)) {
+            <button type="button" class="text-btn text-btn--danger" (click)="askRemoveMember(m)">Remove</button>
           }
         </li>
       }
-      <li class="board-tile board-tile--new">
-        @if (creating()) {
-          <form [formGroup]="form" (ngSubmit)="createBoard()">
-            <input
-              type="text"
-              formControlName="title"
-              placeholder="Board title"
-              aria-label="Board title"
-              autofocus
-              (keydown.escape)="creating.set(false)"
-            />
-            <div class="new-actions">
-              <button type="submit" class="btn btn-primary" [disabled]="form.invalid || pending()">
-                Create
-              </button>
-              <button type="button" class="icon-btn" aria-label="Cancel" (click)="creating.set(false)">
-                &times;
-              </button>
-            </div>
-          </form>
-        } @else {
-          <button type="button" class="new-trigger" (click)="creating.set(true)">
-            + Create new board
-          </button>
-        }
-      </li>
     </ul>
-  </section>
-
-  <section class="specs" aria-label="Sprint figures">
-    <div class="spec">
-      <p class="spec-value spec-value--accent">{{ boards().length }}</p>
-      <p class="label-caps spec-label">Boards</p>
+    <div class="dialog-actions">
+      <button type="button" class="btn btn-outline" (click)="membersDialog.close()">Close</button>
     </div>
-    <div class="spec">
-      <p class="spec-value">0</p>
-      <p class="label-caps spec-label">Cards in flight</p>
-    </div>
-    <div class="spec">
-      <p class="spec-value">0</p>
-      <p class="label-caps spec-label">Shipped</p>
-    </div>
-  </section>
-</main>
-
-<dialog #profileDialog class="confirm-dialog">
-  <p class="label-caps">Profile</p>
-  <p class="profile-email">{{ auth.currentUser()?.email }}</p>
-  <label class="label-caps" for="display-name">Display name</label>
-  <input
-    #nameField
-    id="display-name"
-    type="text"
-    maxlength="60"
-    placeholder="Shown instead of your email"
-    [value]="auth.currentUser()?.displayName ?? ''"
-  />
-  <div class="dialog-actions">
-    <button type="button" class="btn btn-primary" (click)="saveProfile(nameField.value)">Save</button>
-    <button type="button" class="btn btn-outline" (click)="profileDialog.close()">Cancel</button>
-  </div>
+  }
 </dialog>
 
 <dialog #confirmDialog class="confirm-dialog">
   <p>
-    Are you sure you want to delete <strong>{{ pendingDelete()?.title }}</strong>? All its lists
-    and cards will be deleted too. This can't be undone.
+    @if (pendingDelete()?.phrase) {
+      Are you sure you want to {{ pendingDelete()?.title }}? {{ pendingDelete()?.warning }}
+    } @else {
+      Are you sure you want to delete <strong>{{ pendingDelete()?.title }}</strong>? {{ pendingDelete()?.warning }}
+    }
   </p>
   <div class="dialog-actions">
-    <button type="button" class="btn btn-primary" (click)="confirmDelete()">Delete</button>
+    <button type="button" class="btn btn-primary" (click)="confirmDelete()">{{ pendingDelete()?.phrase ? 'Confirm' : 'Delete' }}</button>
     <button type="button" class="btn btn-outline" (click)="confirmDialog.close()">Cancel</button>
   </div>
 </dialog>

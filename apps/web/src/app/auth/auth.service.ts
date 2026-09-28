@@ -33,9 +33,18 @@ export class AuthService {
     return this.accessTokenSignal();
   }
 
-  register(email: string, password: string): Observable<AuthResponse> {
+  register(
+    email: string,
+    password: string,
+    firstName: string,
+    lastName: string,
+  ): Observable<AuthResponse> {
     return this.http
-      .post<AuthResponse>('/auth/register', { email, password }, { withCredentials: true })
+      .post<AuthResponse>(
+        '/auth/register',
+        { email, password, firstName, lastName },
+        { withCredentials: true },
+      )
       .pipe(tap((res) => this.setSession(res)));
   }
 

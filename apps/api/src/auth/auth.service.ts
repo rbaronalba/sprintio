@@ -64,12 +64,12 @@ export class AuthService {
     private readonly jwt: JwtService,
   ) {}
 
-  async register(email: string, password: string): Promise<AuthResult> {
+  async register(email: string, password: string, displayName: string): Promise<AuthResult> {
     const existing = await this.prisma.user.findUnique({ where: { email } });
     if (existing) throw new ConflictException('Email already registered');
 
     const passwordHash = await hashPassword(password);
-    const user = await this.prisma.user.create({ data: { email, passwordHash } });
+    const user = await this.prisma.user.create({ data: { email, passwordHash, displayName } });
     return this.startSession(user);
   }
 

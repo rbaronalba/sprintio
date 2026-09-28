@@ -7,7 +7,9 @@ export interface Comment {
   id: string;
   body: string;
   authorId: string;
-  author: { email: string };
+  author: { email: string; displayName: string | null };
+  /** Images posted with this comment. */
+  attachments: { id: string; path: string; originalName: string }[];
   createdAt: string;
 }
 
@@ -17,7 +19,7 @@ export interface TimeEntry {
   hours: number;
   note: string | null;
   userId: string;
-  user: { email: string };
+  user: { email: string; displayName: string | null };
 }
 
 export interface Attachment {
@@ -56,6 +58,8 @@ export interface List {
   id: string;
   title: string;
   position: number;
+  /** '' (none), a palette color, or an /uploads/ image URL. */
+  background: string;
   boardId: string;
   cards: Card[];
 }
@@ -80,6 +84,11 @@ export class BoardService {
     return this.http.patch<List>(`/lists/${id}`, { position });
   }
 
+  /** A File uploads an image; a string sets a palette color, or '' clears it. */
+  setListBackground(id: string, value: string | File): Observable<{ background: string }> {
+    return this.http.post<{ background: string }>(`/lists/${id}/background`, backgroundBody(value));
+  }
+
   removeList(id: string): Observable<unknown> {
     return this.http.delete(`/lists/${id}`);
   }
@@ -90,7 +99,13 @@ export class BoardService {
 
   updateCard(
     id: string,
-    patch: { title?: string; description?: string | null; dueDate?: string | null; dueDone?: boolean },
+    patch: {
+      title?: string;
+      description?: string | null;
+      dueDate?: string | null;
+      dueDone?: boolean;
+      archived?: boolean;
+    },
   ): Observable<Card> {
     return this.http.patch<Card>(`/cards/${id}`, patch);
   }
@@ -127,8 +142,13 @@ export class BoardService {
     return this.http.get<Comment[]>(`/cards/${cardId}/comments`);
   }
 
-  addComment(cardId: string, body: string): Observable<Comment> {
-    return this.http.post<Comment>(`/cards/${cardId}/comments`, { body });
+  /** With a file the comment is posted as multipart, the image attached to it. */
+  addComment(cardId: string, body: string, file?: File | null): Observable<Comment> {
+    if (!file) return this.http.post<Comment>(`/cards/${cardId}/comments`, { body });
+    const form = new FormData();
+    form.append('body', body);
+    form.append('file', file);
+    return this.http.post<Comment>(`/cards/${cardId}/comments`, form);
   }
 
   removeComment(cardId: string, commentId: string): Observable<unknown> {
@@ -139,8 +159,8 @@ export class BoardService {
     return this.http.get<TimeEntry[]>(`/cards/${cardId}/time`);
   }
 
-  addTimeEntry(cardId: string, date: string, hours: number, note?: string): Observable<TimeEntry> {
-    return this.http.post<TimeEntry>(`/cards/${cardId}/time`, { date, hours, note });
+  addTimeEntry(cardId: string, date: string, hours: number, note?: string, userId?: string): Observable<TimeEntry> {
+    return this.http.post<TimeEntry>(`/cards/${cardId}/time`, { date, hours, note, userId });
   }
 
   removeTimeEntry(cardId: string, entryId: string): Observable<unknown> {
@@ -149,12 +169,6 @@ export class BoardService {
 
   listAttachments(cardId: string): Observable<Attachment[]> {
     return this.http.get<Attachment[]>(`/cards/${cardId}/attachments`);
-  }
-
-  addAttachment(cardId: string, file: File): Observable<Attachment> {
-    const form = new FormData();
-    form.append('file', file);
-    return this.http.post<Attachment>(`/cards/${cardId}/attachments`, form);
   }
 
   removeAttachment(cardId: string, attachmentId: string): Observable<unknown> {
@@ -176,4 +190,11 @@ export class BoardService {
   removeChecklistItem(cardId: string, itemId: string): Observable<unknown> {
     return this.http.delete(`/cards/${cardId}/checklist/${itemId}`);
   }
+}
+
+export function backgroundBody(value: string | File): FormData | { background: string } {
+  if (typeof value === 'string') return { background: value };
+  const form = new FormData();
+  form.append('file', value);
+  return form;
 }

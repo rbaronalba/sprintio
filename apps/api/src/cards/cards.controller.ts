@@ -21,7 +21,7 @@ import {
   parseTimeEntry,
   parseUpsertCard,
 } from './dto.js';
-import { attachmentUploadOptions } from './uploads.js';
+import { attachmentUploadOptions, removeUpload } from './uploads.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
 import type { JwtPayload } from '../auth/auth.service.js';
@@ -84,9 +84,22 @@ export class CardsController {
     return this.cards.listComments(user.sub, id);
   }
 
+  /** JSON `{ body }`, or multipart `body` + an image `file` shown inside the comment. */
   @Post(':id/comments')
-  addComment(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() body: unknown) {
-    return this.cards.addComment(user.sub, id, parseCommentBody(body));
+  @UseInterceptors(FileInterceptor('file', attachmentUploadOptions))
+  async addComment(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Body() body: unknown,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    try {
+      return await this.cards.addComment(user.sub, id, parseCommentBody(body, !!file), file);
+    } catch (e) {
+      // The file hit the disk before the checks ran.
+      if (file) await removeUpload(`/uploads/${file.filename}`);
+      throw e;
+    }
   }
 
   @Delete(':id/comments/:commentId')

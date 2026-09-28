@@ -66,6 +66,10 @@ export function describeEvent(event: ActivityLike): string {
       return `renamed ${str(d, 'from')} to ${list}`;
     case 'LIST_DELETED':
       return `deleted the list ${list}`;
+    case 'BOARD_RENAMED':
+      return `renamed the board ${str(d, 'from')} to ${str(d, 'boardTitle')}`;
+    case 'BOARD_CREATED':
+      return `created ${str(d, 'boardTitle')}`;
     case 'MEMBER_JOINED':
       return `joined ${str(d, 'boardTitle')}`;
     case 'MEMBER_REMOVED':

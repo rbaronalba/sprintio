@@ -4,6 +4,7 @@ import { memberOf } from '../boards/access.js';
 import { EventsService } from '../events/events.service.js';
 import { CARD_FACE_INCLUDE } from '../cards/card-include.js';
 import type { UpsertListInput } from './dto.js';
+import { removeUpload } from '../cards/uploads.js';
 
 const MAX_LISTS_PER_BOARD = 30;
 
@@ -25,7 +26,7 @@ export class ListsService {
       where: { boardId },
       orderBy: { position: 'asc' },
       include: {
-        cards: { orderBy: { position: 'asc' }, include: CARD_FACE_INCLUDE },
+        cards: { where: { archived: false }, orderBy: { position: 'asc' }, include: CARD_FACE_INCLUDE },
       },
     });
   }
@@ -74,9 +75,27 @@ export class ListsService {
     return updated;
   }
 
+  /** Same rules as the board's: any member; a just-uploaded image is deleted again if access fails. */
+  async setBackground(userId: string, id: string, background: string) {
+    const list = await this.findAccessible(userId, id).catch(async (e: unknown) => {
+      await removeUpload(background);
+      throw e;
+    });
+    await this.prisma.list.update({ where: { id }, data: { background } });
+    await removeUpload(list.background);
+    await this.events.record({
+      type: 'BACKGROUND_CHANGED',
+      boardId: list.boardId,
+      actorId: userId,
+      data: { title: list.title },
+    });
+    return { background };
+  }
+
   async remove(userId: string, id: string) {
     const list = await this.findAccessible(userId, id);
     await this.prisma.list.delete({ where: { id } });
+    await removeUpload(list.background);
     await this.events.record({
       type: 'LIST_DELETED',
       boardId: list.boardId,

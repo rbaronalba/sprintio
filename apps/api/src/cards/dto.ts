@@ -16,12 +16,13 @@ export interface UpsertCardInput {
   description?: string | null;
   dueDate?: Date | null;
   dueDone?: boolean;
+  archived?: boolean;
   position?: number;
   listId?: string;
 }
 
 export function parseUpsertCard(body: unknown): UpsertCardInput {
-  const { title, description, dueDate, dueDone, position, listId } = (body ?? {}) as Record<
+  const { title, description, dueDate, dueDone, archived, position, listId } = (body ?? {}) as Record<
     string,
     unknown
   >;
@@ -56,6 +57,11 @@ export function parseUpsertCard(body: unknown): UpsertCardInput {
     result.dueDone = dueDone;
   }
 
+  if (archived !== undefined) {
+    if (typeof archived !== 'boolean') throw new BadRequestException('archived must be a boolean');
+    result.archived = archived;
+  }
+
   // Applied last so it wins over an explicit dueDone in the same body: a completion
   // flag on a card with no due date is meaningless.
   if (result.dueDate === null) result.dueDone = false;
@@ -86,9 +92,10 @@ export function extractMentions(body: string): string[] {
   return [...new Set(Array.from(body.matchAll(MENTION_PATTERN), (m) => m[1].toLowerCase()))];
 }
 
-export function parseCommentBody(body: unknown): string {
-  const { body: text } = (body ?? {}) as Record<string, unknown>;
-  if (typeof text !== 'string' || text.trim().length === 0) {
+/** `withFile`: an image-only comment is fine, so the text may be empty. */
+export function parseCommentBody(body: unknown, withFile = false): string {
+  const { body: text = withFile ? '' : undefined } = (body ?? {}) as Record<string, unknown>;
+  if (typeof text !== 'string' || (!withFile && text.trim().length === 0)) {
     throw new BadRequestException('Comment body is required');
   }
   if (text.length > 2000) {
@@ -101,10 +108,12 @@ export interface UpsertTimeEntryInput {
   date: Date;
   hours: number;
   note?: string;
+  /** Whose time this is. Omitted means the caller's own. */
+  userId?: string;
 }
 
 export function parseTimeEntry(body: unknown): UpsertTimeEntryInput {
-  const { date, hours, note } = (body ?? {}) as Record<string, unknown>;
+  const { date, hours, note, userId } = (body ?? {}) as Record<string, unknown>;
 
   if (typeof hours !== 'number' || !Number.isFinite(hours) || hours <= 0 || hours > 24) {
     throw new BadRequestException('Hours must be a number between 0 and 24');
@@ -113,7 +122,16 @@ export function parseTimeEntry(body: unknown): UpsertTimeEntryInput {
     throw new BadRequestException('Note must be a string of at most 200 characters');
   }
 
-  return { date: parseDateString(date, 'date'), hours, note: (note as string | undefined)?.trim() || undefined };
+  if (userId !== undefined && (typeof userId !== 'string' || userId.length === 0)) {
+    throw new BadRequestException('Invalid userId');
+  }
+
+  return {
+    date: parseDateString(date, 'date'),
+    hours,
+    note: (note as string | undefined)?.trim() || undefined,
+    userId: userId as string | undefined,
+  };
 }
 
 export function parseChecklistText(body: unknown): string {

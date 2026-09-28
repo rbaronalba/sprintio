@@ -1,111 +1,237 @@
-import { ChangeDetectionStrategy, Component, ElementRef, inject, signal, viewChild } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
+import { ActivatedRoute, Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Subject, debounceTime, distinctUntilChanged, switchMap } from 'rxjs';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '../auth/auth.service';
-import { ThemeToggleComponent } from '../theme-toggle/theme-toggle.component';
-import { NotificationBellComponent } from '../realtime/notification-bell.component';
-import { Board, BoardsService, SearchHit } from '../boards/boards.service';
+import { AppHeaderComponent } from '../header/app-header.component';
+import { Board, BoardsService, Member, Workspace } from '../services/boards.service';
+import { avatarStyle, initials } from '../shared/avatar';
+import { backgroundStyle } from '../shared/background';
 
+const RECENT_COUNT = 3;
+
+/**
+ * One component, three routes: Home (/dashboard), all boards (/dashboard/boards) and a
+ * single workspace's boards (/dashboard/w/:id). The sidebar is the same on all three.
+ */
 @Component({
   selector: 'app-dashboard',
-  imports: [ThemeToggleComponent, ReactiveFormsModule, RouterLink, NotificationBellComponent],
+  imports: [AppHeaderComponent, NgTemplateOutlet, ReactiveFormsModule, RouterLink, RouterLinkActive],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss',
 })
 export class DashboardComponent {
   readonly auth = inject(AuthService);
-  private readonly router = inject(Router);
   private readonly boardsApi = inject(BoardsService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  private readonly header = viewChild.required(AppHeaderComponent);
+
+  readonly view = signal<'home' | 'boards'>(this.route.snapshot.data['view'] ?? 'home');
+  /** Set on /dashboard/w/:id: the boards view then shows just that workspace. */
+  readonly workspaceId = signal(this.route.snapshot.paramMap.get('id'));
 
   readonly boards = signal<Board[]>([]);
+  readonly workspaces = signal<Workspace[]>([]);
   readonly pending = signal(false);
-  readonly creating = signal(false);
-  readonly pendingDelete = signal<Board | null>(null);
+  /** The workspace whose "Create new board" tile is showing its form. */
+  readonly creatingIn = signal<string | null>(null);
+  /** What the confirm dialog is about to delete: its name, the warning, and the action. */
+  readonly pendingDelete = signal<{ title: string; warning: string; run: () => void; phrase: boolean } | null>(null);
+  /** The workspace whose name is showing as an input. */
+  readonly renamingWs = signal<string | null>(null);
   private readonly confirmDialog = viewChild.required<ElementRef<HTMLDialogElement>>('confirmDialog');
-  private readonly profileDialog = viewChild.required<ElementRef<HTMLDialogElement>>('profileDialog');
+  private readonly workspaceDialog = viewChild.required<ElementRef<HTMLDialogElement>>('workspaceDialog');
+  private readonly membersDialog = viewChild.required<ElementRef<HTMLDialogElement>>('membersDialog');
 
-  readonly searchTerm = signal('');
-  readonly searchHits = signal<SearchHit[]>([]);
-  private readonly searchInput = new Subject<string>();
+  /** The workspace whose Members dialog is open, and its member list. */
+  readonly membersOf = signal<Workspace | null>(null);
+  readonly members = signal<Member[]>([]);
+  readonly shareLink = computed(() => {
+    const token = this.membersOf()?.inviteToken;
+    return token ? `${location.origin}/join/w/${token}` : null;
+  });
+
+  readonly avatarStyle = avatarStyle;
+  readonly initials = initials;
+  readonly bgStyle = backgroundStyle;
+
+  readonly starred = computed(() => this.boards().filter((b) => b.starred));
+
+  readonly recent = computed(() =>
+    this.boards()
+      .filter((b) => b.lastViewedAt)
+      .sort((a, b) => b.lastViewedAt!.localeCompare(a.lastViewedAt!))
+      .slice(0, RECENT_COUNT),
+  );
+
+  /** Workspaces to render with their boards; just the one on a workspace page. */
+  readonly sections = computed(() => {
+    const only = this.workspaceId();
+    return this.workspaces()
+      .filter((w) => !only || w.id === only)
+      .map((w) => ({ workspace: w, boards: this.boards().filter((b) => b.workspaceId === w.id) }));
+  });
 
   readonly form = inject(FormBuilder).nonNullable.group({
     title: ['', [Validators.required, Validators.maxLength(100)]],
   });
 
   constructor() {
+    this.load();
+  }
+
+  private load(): void {
     this.boardsApi.list().subscribe((boards) => this.boards.set(boards));
-
-    this.searchInput
-      .pipe(
-        debounceTime(250),
-        distinctUntilChanged(),
-        // switchMap, not mergeMap: a slow response for "ca" must never overwrite
-        // the results for "card" the user has already typed.
-        switchMap((term) => this.boardsApi.search(term)),
-        takeUntilDestroyed(),
-      )
-      .subscribe((hits) => this.searchHits.set(hits));
+    this.boardsApi.listWorkspaces().subscribe((ws) => this.workspaces.set(ws));
   }
 
-  search(term: string): void {
-    this.searchTerm.set(term);
-    this.searchInput.next(term.trim());
+  isOwner(w: Workspace): boolean {
+    return w.ownerId === this.auth.currentUser()?.sub;
   }
 
-  clearSearch(): void {
-    this.searchTerm.set('');
-    this.searchHits.set([]);
-    this.searchInput.next('');
+  workspaceName(id: string): string {
+    return this.workspaces().find((w) => w.id === id)?.name ?? '';
   }
 
-  openHit(hit: SearchHit): void {
-    this.clearSearch();
-    void this.router.navigate(['/boards', hit.boardId], { queryParams: { card: hit.cardId } });
+  /** The header already owns the create-board dialog (with its workspace picker). */
+  openCreateBoard(): void {
+    this.header().openCreate();
   }
 
-  openProfile(): void {
-    this.profileDialog().nativeElement.showModal();
+  startCreate(workspaceId: string): void {
+    this.form.reset();
+    this.creatingIn.set(workspaceId);
   }
 
-  saveProfile(displayName: string): void {
-    this.auth.updateProfile(displayName.trim() || null).subscribe(() => {
-      this.profileDialog().nativeElement.close();
-    });
-  }
-
-  createBoard(): void {
+  createBoard(workspaceId: string): void {
     if (this.form.invalid) return;
     this.pending.set(true);
     const { title } = this.form.getRawValue();
-    this.boardsApi.create(title).subscribe((board) => {
-      this.boards.update((boards) => [board, ...boards]);
-      this.form.reset();
-      this.creating.set(false);
-      this.pending.set(false);
+    this.boardsApi.create(title, workspaceId).subscribe({
+      next: (board) => {
+        this.boards.update((boards) => [{ ...board, starred: false, lastViewedAt: null }, ...boards]);
+        this.form.reset();
+        this.creatingIn.set(null);
+        this.pending.set(false);
+      },
+      error: () => this.pending.set(false),
     });
   }
 
+  openCreateWorkspace(): void {
+    this.workspaceDialog().nativeElement.showModal();
+  }
+
+  createWorkspace(field: HTMLInputElement): void {
+    const name = field.value.trim();
+    if (!name) return;
+    this.boardsApi.createWorkspace(name).subscribe((ws) => {
+      this.workspaces.update((list) => [...list, ws]);
+      field.value = '';
+      this.workspaceDialog().nativeElement.close();
+    });
+  }
+
+  /** Optimistic, rolled back if the API refuses. */
+  toggleStar(board: Board): void {
+    const set = (starred: boolean) =>
+      this.boards.update((boards) => boards.map((b) => (b.id === board.id ? { ...b, starred } : b)));
+    set(!board.starred);
+    this.boardsApi.setStarred(board.id, !board.starred).subscribe({ error: () => set(board.starred) });
+  }
+
   askDelete(board: Board): void {
-    this.pendingDelete.set(board);
+    this.confirm(board.title, "All its lists and cards will be deleted too. This can't be undone.", () =>
+      this.boardsApi.remove(board.id).subscribe(() => {
+        this.boards.update((boards) => boards.filter((b) => b.id !== board.id));
+      }),
+    );
+  }
+
+  askDeleteWorkspace(w: Workspace): void {
+    this.confirm(w.name, "Every board in this workspace, with all its lists and cards, will be deleted too. This can't be undone.", () =>
+      this.boardsApi.removeWorkspace(w.id).subscribe(() => {
+        this.workspaces.update((list) => list.filter((x) => x.id !== w.id));
+        this.boards.update((boards) => boards.filter((b) => b.workspaceId !== w.id));
+        if (this.workspaceId() === w.id) void this.router.navigate(['/boards']);
+      }),
+    );
+  }
+
+  /** Saves on Enter/blur; an empty or unchanged name just closes the input. */
+  renameWorkspace(w: Workspace, value: string): void {
+    if (this.renamingWs() !== w.id) return; // blur after Enter/Escape already handled it
+    this.renamingWs.set(null);
+    const name = value.trim();
+    if (!name || name === w.name) return;
+    this.boardsApi.renameWorkspace(w.id, name).subscribe((updated) => {
+      this.workspaces.update((list) => list.map((x) => (x.id === w.id ? updated : x)));
+    });
+  }
+
+  openMembers(w: Workspace): void {
+    this.membersOf.set(w);
+    this.members.set([]);
+    this.boardsApi.workspaceMembers(w.id).subscribe((m) => this.members.set(m));
+    this.membersDialog().nativeElement.showModal();
+  }
+
+  createInvite(): void {
+    const w = this.membersOf();
+    if (!w) return;
+    this.boardsApi.createWorkspaceInvite(w.id).subscribe(({ token }) => this.setInviteToken(w.id, token));
+  }
+
+  stopSharing(): void {
+    const w = this.membersOf();
+    if (!w) return;
+    this.boardsApi.revokeWorkspaceInvite(w.id).subscribe(() => this.setInviteToken(w.id, null));
+  }
+
+  private setInviteToken(id: string, inviteToken: string | null): void {
+    this.workspaces.update((list) => list.map((x) => (x.id === id ? { ...x, inviteToken } : x)));
+    this.membersOf.update((w) => (w ? { ...w, inviteToken } : w));
+  }
+
+  copyLink(input: HTMLInputElement): void {
+    input.select();
+    void navigator.clipboard?.writeText(input.value);
+  }
+
+  /**
+   * Remove someone, or pass yourself to leave. The Members dialog closes first: the confirm
+   * dialog lives outside it, and a modal dialog makes everything outside it inert.
+   */
+  askRemoveMember(m: Member): void {
+    const w = this.membersOf();
+    if (!w) return;
+    const leaving = m.userId === this.auth.currentUser()?.sub;
+    this.membersDialog().nativeElement.close();
+    this.confirm(
+      leaving ? `leave ${w.name}` : `remove ${m.displayName || m.email} from ${w.name}`,
+      leaving
+        ? "You'll lose access to its boards, except the ones you created."
+        : "They'll lose access to its boards, except the ones they created.",
+      () =>
+        this.boardsApi.removeWorkspaceMember(w.id, m.userId).subscribe(() => {
+          if (!leaving) return;
+          if (this.workspaceId() === w.id) void this.router.navigate(['/boards']);
+          this.load();
+        }),
+      true,
+    );
+  }
+
+  /** `phrase`: the title is the whole action ("leave X") rather than a thing to delete. */
+  private confirm(title: string, warning: string, run: () => void, phrase = false): void {
+    this.pendingDelete.set({ title, warning, run, phrase });
     this.confirmDialog().nativeElement.showModal();
   }
 
   confirmDelete(): void {
-    const board = this.pendingDelete();
-    if (board) this.removeBoard(board.id);
+    this.pendingDelete()?.run();
     this.confirmDialog().nativeElement.close();
-  }
-
-  removeBoard(id: string): void {
-    this.boardsApi.remove(id).subscribe(() => {
-      this.boards.update((boards) => boards.filter((b) => b.id !== id));
-    });
-  }
-
-  logout(): void {
-    this.auth.logout().subscribe(() => void this.router.navigate(['/login']));
   }
 }
