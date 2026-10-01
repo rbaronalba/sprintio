@@ -5,14 +5,23 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { memberOf } from '../boards/access.js';
 import { EventsService } from '../events/events.service.js';
 import { UPLOAD_DIR } from './uploads.js';
-import { CARD_FACE_INCLUDE } from './card-include.js';
+import { CARD_FACE_SELECT, withTotals } from './card-include.js';
 import { extractMentions } from './dto.js';
-import type { UpdateChecklistItemInput, UpsertCardInput, UpsertTimeEntryInput } from './dto.js';
+import { place, type Placement } from '../common/position.js';
+import type { UpdateChecklistItemInput, UpdateTimeEntryInput, UpsertCardInput, UpsertTimeEntryInput } from './dto.js';
 
 const MAX_CARDS_PER_LIST = 200;
+/** Archived cards don't count against the list's 200, but archiving can't be a way around every limit. */
+const MAX_CARDS_INCL_ARCHIVED = 1000;
 const MAX_CHECKLIST_ITEMS = 100;
+/** Per uploader, across every board: what stops one account from filling the disk 8 MB at a time. */
+const MAX_UPLOAD_BYTES_PER_USER = 500 * 1024 * 1024;
 /** Activity is a feed, not an audit export. */
 const ACTIVITY_PAGE = 50;
+const COMMENT_PAGE = 50;
+/** A card is a task, not a chat room: past this, something is misusing it. */
+const MAX_COMMENTS_PER_CARD = 1000;
+const MAX_ATTACHMENTS_PER_CARD = 100;
 
 const COMMENT_INCLUDE = {
   author: { select: { email: true, displayName: true } },
@@ -33,9 +42,26 @@ export class CardsService {
   }
 
   private async assertRoom(listId: string) {
-    if ((await this.prisma.card.count({ where: { listId } })) >= MAX_CARDS_PER_LIST) {
+    const [visible, all] = await Promise.all([
+      this.prisma.card.count({ where: { listId, archived: false } }),
+      this.prisma.card.count({ where: { listId } }),
+    ]);
+    // ponytail: count-then-write, so two racing requests can land one card over; a soft cap.
+    if (visible >= MAX_CARDS_PER_LIST || all >= MAX_CARDS_INCL_ARCHIVED) {
       throw new BadRequestException('Card limit reached');
     }
+  }
+
+  /** Where card `id` lands right after `afterId` in `listId`, from current rows. */
+  private async placeIn(listId: string, id: string, afterId: string | null): Promise<Placement> {
+    const siblings = await this.prisma.card.findMany({
+      where: { listId, id: { not: id } },
+      orderBy: [{ position: 'asc' }, { id: 'asc' }],
+      select: { id: true, position: true },
+    });
+    const placement = place(siblings, afterId);
+    if (!placement) throw new BadRequestException('afterId is not a card in the target list');
+    return placement;
   }
 
   async create(userId: string, listId: string, title: string) {
@@ -45,10 +71,10 @@ export class CardsService {
       where: { listId },
       orderBy: { position: 'desc' },
     });
-    const card = await this.prisma.card.create({
-      data: { title, listId, position: (last?.position ?? 0) + 1000 },
-      include: CARD_FACE_INCLUDE,
-    });
+    const [card] = await withTotals(
+      this.prisma,
+      [await this.prisma.card.create({ data: { title, listId, position: (last?.position ?? 0) + 1000 }, select: CARD_FACE_SELECT })],
+    );
     await this.events.record({
       type: 'CARD_CREATED',
       boardId: list.boardId,
@@ -68,16 +94,41 @@ export class CardsService {
     return card;
   }
 
+  /** One card as the board shows it, plus its description: what the modal and live updates fetch. */
+  async getOne(userId: string, id: string) {
+    await this.findAccessible(userId, id);
+    const card = await this.prisma.card.findUniqueOrThrow({
+      where: { id },
+      select: { ...CARD_FACE_SELECT, description: true },
+    });
+    return (await withTotals(this.prisma, [card]))[0];
+  }
+
   async update(userId: string, id: string, input: UpsertCardInput) {
     const card = await this.findAccessible(userId, id);
+    const { afterId, ...fields } = input;
     let target: { title: string } | null = null;
-    if (input.listId) {
-      target = await this.assertListAccess(userId, input.listId);
-      if (input.listId !== card.listId) await this.assertRoom(input.listId);
+    if (fields.listId) {
+      target = await this.assertListAccess(userId, fields.listId);
+      if (fields.listId !== card.listId) await this.assertRoom(fields.listId);
     }
-    const updated = await this.prisma.card.update({ where: { id }, data: input });
+    // Restoring an archived card puts it back on the board: the visible cap applies again.
+    if (card.archived && fields.archived === false) await this.assertRoom(fields.listId ?? card.listId);
+    const placement = afterId === undefined ? null : await this.placeIn(fields.listId ?? card.listId, id, afterId);
+    const updated = await this.prisma.$transaction(async (tx) => {
+      // ponytail: one UPDATE per sibling (max 1000), only when a gap runs out; a VALUES join if that ever shows up.
+      for (const r of placement?.renumber ?? []) {
+        await tx.card.update({ where: { id: r.id }, data: { position: r.position } });
+      }
+      return tx.card.update({ where: { id }, data: { ...fields, ...(placement && { position: placement.position }) } });
+    });
+    const renumbered = !!placement?.renumber;
+    if (renumbered) {
+      // Every position in the list changed: open boards must reload, not patch one card.
+      await this.events.record({ type: 'BOARD_REORDERED', boardId: card.list.boardId, actorId: userId, live: true });
+    }
 
-    const moved = input.listId !== undefined && input.listId !== card.listId;
+    const moved = fields.listId !== undefined && fields.listId !== card.listId;
     if (moved) {
       const from = await this.prisma.list.findUnique({
         where: { id: card.listId },
@@ -91,17 +142,20 @@ export class CardsService {
         data: { title: updated.title, from: from?.title ?? '?', to: target?.title ?? '?' },
         notify: await this.assigneeIds(id),
       });
-    } else if (!isReorderOnly(input)) {
-      // A pure drag within the same list is noise in a feed, so it isn't recorded.
+    } else if (Object.keys(fields).some((k) => k !== 'listId')) {
       await this.events.record({
         type: 'CARD_UPDATED',
         boardId: card.list.boardId,
         actorId: userId,
         cardId: id,
-        data: { title: updated.title, fields: Object.keys(input).filter((k) => k !== 'position') },
+        data: { title: updated.title, fields: Object.keys(fields) },
       });
+    } else if (placement && !renumbered) {
+      // A pure drag within the same list is noise in a feed, but open boards still need it.
+      await this.events.record({ type: 'CARD_REORDERED', boardId: card.list.boardId, actorId: userId, cardId: id, live: true });
     }
-    return updated;
+    // `renumbered` tells the caller its local positions are stale: reload the board.
+    return { ...updated, renumbered };
   }
 
   async remove(userId: string, id: string) {
@@ -116,6 +170,17 @@ export class CardsService {
       cardId: id,
       data: { title: card.title },
     });
+  }
+
+  /** Throws when this upload would take the user past their storage quota, or the card past its cap. */
+  private async assertQuota(userId: string, file: Express.Multer.File, cardId: string): Promise<void> {
+    if ((await this.prisma.attachment.count({ where: { cardId } })) >= MAX_ATTACHMENTS_PER_CARD) {
+      throw new BadRequestException('Attachment limit reached');
+    }
+    const { _sum } = await this.prisma.attachment.aggregate({ where: { uploaderId: userId }, _sum: { size: true } });
+    if ((_sum.size ?? 0) + file.size > MAX_UPLOAD_BYTES_PER_USER) {
+      throw new BadRequestException('Storage quota exceeded: delete some attachments first');
+    }
   }
 
   private async assigneeIds(cardId: string): Promise<string[]> {
@@ -165,6 +230,7 @@ export class CardsService {
       actorId: userId,
       cardId,
       data: { title: card.title, targetId: targetUserId },
+      notify: [targetUserId],
     });
   }
 
@@ -200,17 +266,25 @@ export class CardsService {
     });
   }
 
-  async listComments(userId: string, cardId: string) {
+  /** Newest page first in the query, returned oldest-first so the UI can simply render it. */
+  async listComments(userId: string, cardId: string, before?: string) {
     await this.findAccessible(userId, cardId);
-    return this.prisma.comment.findMany({
+    const page = await this.prisma.comment.findMany({
       where: { cardId },
-      orderBy: { createdAt: 'asc' },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: COMMENT_PAGE,
+      ...(before && { cursor: { id: before }, skip: 1 }),
       include: COMMENT_INCLUDE,
     });
+    return page.reverse();
   }
 
   async addComment(userId: string, cardId: string, body: string, file?: Express.Multer.File) {
     const card = await this.findAccessible(userId, cardId);
+    if ((await this.prisma.comment.count({ where: { cardId } })) >= MAX_COMMENTS_PER_CARD) {
+      throw new BadRequestException('Comment limit reached');
+    }
+    if (file) await this.assertQuota(userId, file, cardId);
     const comment = await this.prisma.comment.create({
       data: {
         cardId,
@@ -285,9 +359,23 @@ export class CardsService {
       });
       if (!member) throw new BadRequestException('User is not a member of this board');
     }
-    const entry = await this.prisma.timeEntry.create({
-      data: { ...input, cardId, userId: owner },
-      include: { user: { select: { email: true, displayName: true } } },
+    // Same person + same day adds onto the existing row instead of making a new one.
+    const { date, hours, note } = input;
+    const entry = await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.timeEntry.findUnique({
+        where: { cardId_userId_date: { cardId, userId: owner, date } },
+      });
+      const merged = await tx.timeEntry.upsert({
+        where: { cardId_userId_date: { cardId, userId: owner, date } },
+        create: { date, hours, note, cardId, userId: owner },
+        update: {
+          hours: { increment: hours },
+          ...(note && { note: existing?.note ? `${existing.note}; ${note}`.slice(0, 200) : note }),
+        },
+        include: { user: { select: { email: true, displayName: true } } },
+      });
+      if (merged.hours > 24) throw new BadRequestException('A day cannot have more than 24 hours');
+      return merged;
     });
     await this.events.record({
       type: 'TIME_LOGGED',
@@ -297,6 +385,17 @@ export class CardsService {
       data: { title: card.title, hours: input.hours },
     });
     return entry;
+  }
+
+  async updateTimeEntry(userId: string, cardId: string, entryId: string, input: UpdateTimeEntryInput) {
+    await this.findAccessible(userId, cardId);
+    // Same rule as removal: only the person whose time it is can change it.
+    const { count } = await this.prisma.timeEntry.updateMany({ where: { id: entryId, cardId, userId }, data: input });
+    if (count === 0) throw new BadRequestException('Time entry not found');
+    return this.prisma.timeEntry.findUniqueOrThrow({
+      where: { id: entryId },
+      include: { user: { select: { email: true, displayName: true } } },
+    });
   }
 
   async removeTimeEntry(userId: string, cardId: string, entryId: string) {
@@ -318,6 +417,7 @@ export class CardsService {
 
   async addAttachment(userId: string, cardId: string, file: Express.Multer.File) {
     const card = await this.findAccessible(userId, cardId);
+    await this.assertQuota(userId, file, cardId);
     const attachment = await this.prisma.attachment.create({
       data: { cardId, uploaderId: userId, path: file.filename, originalName: file.originalname, size: file.size },
       include: { uploader: { select: { email: true } } },
@@ -400,9 +500,4 @@ export class CardsService {
       data: { title: card.title, text: item.text },
     });
   }
-}
-
-/** A drag that only changes order says nothing worth putting in a feed. */
-function isReorderOnly(input: UpsertCardInput): boolean {
-  return Object.keys(input).every((key) => key === 'position' || key === 'listId');
 }

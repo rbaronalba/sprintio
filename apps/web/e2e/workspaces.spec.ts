@@ -5,25 +5,25 @@ test('a workspace invite link gives access to every board in it', async ({ page,
   await register(page, uniqueEmail('ws-owner'));
 
   // Create the workspace and a board in it from the Boards page.
-  await page.getByRole('link', { name: 'Boards' }).click();
-  await page.getByRole('button', { name: 'Create workspace' }).click();
-  await page.getByLabel('Workspace name').fill('Software');
-  await page.getByRole('button', { name: 'Create', exact: true }).click();
+  await page.getByRole('link', { name: 'Tableros' }).click();
+  await page.getByRole('button', { name: 'Crear espacio de trabajo' }).click();
+  await page.getByLabel('Nombre del espacio de trabajo').fill('Software');
+  await page.getByRole('button', { name: 'Crear', exact: true }).click();
   const software = page.getByRole('region', { name: 'Software' });
-  await software.getByRole('button', { name: '+ Create new board' }).click();
-  await software.getByLabel('Board title').fill('Backend');
-  await software.getByRole('button', { name: 'Create', exact: true }).click();
+  await software.getByRole('button', { name: '+ Nuevo tablero' }).click();
+  await software.getByLabel('Título del tablero').fill('Backend');
+  await software.getByRole('button', { name: 'Crear', exact: true }).click();
   await expect(software.getByRole('link', { name: 'Backend' })).toBeVisible();
 
-  await software.getByRole('button', { name: 'Members' }).click();
-  await page.getByRole('button', { name: 'Create invite link' }).click();
-  const link = await page.getByLabel('Workspace invitation link').inputValue();
+  await software.getByRole('button', { name: 'Miembros' }).click();
+  await page.getByRole('button', { name: 'Crear enlace de invitación' }).click();
+  const link = await page.getByLabel('Enlace de invitación al espacio de trabajo').inputValue();
 
   const guestContext = await browser.newContext();
   const guest = await guestContext.newPage();
   await register(guest, uniqueEmail('ws-guest'), 'Guest Driver');
   await guest.goto(new URL(link).pathname);
-  await guest.getByRole('button', { name: 'Join workspace' }).click();
+  await guest.getByRole('button', { name: 'Unirse al espacio de trabajo' }).click();
   await expect(guest).toHaveURL(/\/w\//);
 
   await guest.getByRole('link', { name: 'Backend' }).click();

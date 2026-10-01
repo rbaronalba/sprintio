@@ -8,10 +8,10 @@ const call = async (m, p, t, body) => {
   let j = null; try { j = await r.json(); } catch {}
   return { s: r.status, j };
 };
-const post = async (p, t, body, type = 'image/png') => {
+const post = async (p, t, body, name = 'photo.png') => {
   const form = new FormData();
   if (body !== undefined) form.append('body', body);
-  form.append('file', new Blob([new Uint8Array([137, 80, 78, 71])], { type }), 'photo.png');
+  form.append('file', new Blob([new Uint8Array([137, 80, 78, 71])]), name);
   const r = await fetch(B + p, { method: 'POST', headers: { authorization: 'Bearer ' + t }, body: form });
   return { s: r.status, j: await r.json().catch(() => null) };
 };
@@ -31,7 +31,10 @@ ok(r.s === 201 && r.j.body === 'look at this' && r.j.attachments.length === 1, '
 const withImg = r.j, url = `/uploads/${r.j.attachments[0].path}`;
 ok((await fetch(B + url)).status === 200, 'image served');
 ok((await post(base, a, undefined)).s === 201, 'image-only comment allowed');
-ok((await post(base, a, 'x', 'text/html')).s === 400, 'non-image refused');
+ok((await post(base, a, 'x', 'page.html')).s === 400, 'disallowed type refused');
+r = await post(base, a, 'the log', 'server.LOG');
+const file = await fetch(`${B}/uploads/${r.j?.attachments[0].path}`);
+ok(r.s === 201 && file.headers.get('content-disposition') === 'attachment', 'non-image accepted, served as a download');
 ok((await post(base, x, 'intruder')).s === 404, 'non-member refused');
 
 const comments = (await call('GET', base, a)).j;

@@ -1,8 +1,8 @@
-/* Ferrari design system — dark canvas is the brand base; the light theme is built
-   from the doc's own editorial-band tokens (canvas-light / body-on-light / surface-soft-light). */
+/* Ferrari design system, light only: built from the doc's editorial-band tokens
+   (canvas-light / body-on-light / surface-soft-light). */
 
 :root {
-  /* Brand voltage — constant across themes. Rosso Corsa is the only saturated color. */
+  /* Brand voltage. Rosso Corsa is the only saturated color. */
   --primary: #da291c;
   --primary-active: #b01e0a;
   --on-primary: #ffffff;
@@ -26,20 +26,6 @@
 
   --font-sans: 'Inter', -apple-system, system-ui, sans-serif;
 
-  /* Dark theme (brand default) */
-  --canvas: #181818;
-  --canvas-elevated: #303030;
-  --surface-card: #303030;
-  --ink: #ffffff;
-  --body: #969696;
-  --muted: #8f8f8f;
-  --hairline: #303030;
-  --cinema-gradient: linear-gradient(180deg, #3c3c3c, #030303 64%);
-  --input-bg: #181818;
-  color-scheme: dark;
-}
-
-:root[data-theme='light'] {
   --canvas: #ffffff;
   --canvas-elevated: #f7f7f7;
   --surface-card: #f7f7f7;
@@ -175,4 +161,31 @@ select:focus {
   p { margin: 0; }
   ul, ol { margin: 2px 0; padding-inline-start: 20px; }
   code { padding: 0 4px; border-radius: var(--radius-sm); background: var(--canvas-elevated); font-size: 12px; }
+}
+
+/* A button that reads as a text link ("Mark all read", "Show older comments"). */
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--primary);
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+}
+
+/* A board label (colour set inline). Sizes vary by context: card faces shrink it. */
+.label-chip {
+  display: inline-flex;
+  min-width: 40px;
+  min-height: 20px;
+  align-items: center;
+  width: max-content;
+  max-width: 100%;
+  padding: 2px var(--space-xxs);
+  border-radius: var(--radius-sm);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
 }

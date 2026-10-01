@@ -2,9 +2,10 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service.js';
 import { memberOf } from '../boards/access.js';
 import { EventsService } from '../events/events.service.js';
-import { CARD_FACE_INCLUDE } from '../cards/card-include.js';
+import { CARD_FACE_SELECT, withTotals } from '../cards/card-include.js';
 import type { UpsertListInput } from './dto.js';
 import { removeUpload } from '../cards/uploads.js';
+import { place } from '../common/position.js';
 
 const MAX_LISTS_PER_BOARD = 30;
 
@@ -22,13 +23,17 @@ export class ListsService {
 
   async list(userId: string, boardId: string) {
     await this.assertBoardAccess(userId, boardId);
-    return this.prisma.list.findMany({
+    const lists = await this.prisma.list.findMany({
       where: { boardId },
-      orderBy: { position: 'asc' },
+      // id breaks ties, so two items that ended up on the same position keep a stable order.
+      orderBy: [{ position: 'asc' }, { id: 'asc' }],
       include: {
-        cards: { where: { archived: false }, orderBy: { position: 'asc' }, include: CARD_FACE_INCLUDE },
+        cards: { where: { archived: false }, orderBy: [{ position: 'asc' }, { id: 'asc' }], select: CARD_FACE_SELECT },
       },
     });
+    // Totals for the whole board in one pass, then dealt back to their lists.
+    const cards = new Map((await withTotals(this.prisma, lists.flatMap((l) => l.cards))).map((c) => [c.id, c]));
+    return lists.map((l) => ({ ...l, cards: l.cards.map((c) => cards.get(c.id)!) }));
   }
 
   async create(userId: string, boardId: string, title: string) {
@@ -62,7 +67,27 @@ export class ListsService {
 
   async update(userId: string, id: string, input: UpsertListInput) {
     const list = await this.findAccessible(userId, id);
-    const updated = await this.prisma.list.update({ where: { id }, data: input });
+    const { afterId, ...fields } = input;
+    let renumber: { id: string; position: number }[] = [];
+    let position: number | undefined;
+    if (afterId !== undefined) {
+      const siblings = await this.prisma.list.findMany({
+        where: { boardId: list.boardId, id: { not: id } },
+        orderBy: [{ position: 'asc' }, { id: 'asc' }],
+        select: { id: true, position: true },
+      });
+      const placement = place(siblings, afterId);
+      if (!placement) throw new BadRequestException('afterId is not a list on this board');
+      ({ position, renumber = [] } = placement);
+    }
+    const updated = await this.prisma.$transaction(async (tx) => {
+      for (const r of renumber) await tx.list.update({ where: { id: r.id }, data: { position: r.position } });
+      return tx.list.update({ where: { id }, data: { ...fields, ...(position !== undefined && { position }) } });
+    });
+    if (afterId !== undefined) {
+      // Not feed-worthy, but other open boards must re-read the order (a full reload: lists are few).
+      await this.events.record({ type: 'LIST_REORDERED', boardId: list.boardId, actorId: userId, live: true });
+    }
     // Reordering lists is not feed-worthy; renaming them is.
     if (input.title !== undefined && input.title !== list.title) {
       await this.events.record({
@@ -72,7 +97,7 @@ export class ListsService {
         data: { from: list.title, listTitle: updated.title },
       });
     }
-    return updated;
+    return { ...updated, renumbered: renumber.length > 0 };
   }
 
   /** Same rules as the board's: any member; a just-uploaded image is deleted again if access fails. */

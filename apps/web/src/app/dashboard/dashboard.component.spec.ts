@@ -67,8 +67,8 @@ describe('DashboardComponent', () => {
 
     const groups: HTMLElement[] = Array.from(fixture.nativeElement.querySelectorAll('section.group'));
     expect(groups.map((g) => g.getAttribute('aria-label'))).toEqual(['Software', 'Admin']);
-    expect(groups[0].querySelector('button[aria-label="Remove board"]')).not.toBeNull();
-    expect(groups[1].querySelector('button[aria-label="Remove board"]')).toBeNull();
+    expect(groups[0].querySelector('button[aria-label="Eliminar tablero"]')).not.toBeNull();
+    expect(groups[1].querySelector('button[aria-label="Eliminar tablero"]')).toBeNull();
     // Only workspace members add boards; w2 is only visible through a directly shared board.
     expect(groups[0].querySelector('.board-tile--new')).not.toBeNull();
     expect(groups[1].querySelector('.board-tile--new')).toBeNull();

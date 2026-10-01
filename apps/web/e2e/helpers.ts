@@ -19,7 +19,7 @@ export async function register(page: Page, email: string, name = 'Test Driver'):
   await page.locator('#lastName').fill(last);
   await page.locator('#email').fill(email);
   await page.locator('#password').fill(PASSWORD);
-  await page.getByRole('button', { name: 'Create account' }).click();
+  await page.getByRole('button', { name: 'Crear cuenta' }).click();
   await expect(page).toHaveURL(/\/home/);
 }
 
@@ -27,15 +27,15 @@ export async function login(page: Page, email: string): Promise<void> {
   await page.goto('/login');
   await page.locator('#email').fill(email);
   await page.locator('#password').fill(PASSWORD);
-  await page.getByRole('button', { name: /sign in/i }).click();
+  await page.getByRole('button', { name: /iniciar sesión/i }).click();
   await expect(page).toHaveURL(/\/home/);
 }
 
 /** Creates a board from the header's Create dialog, which opens it. Returns its id from the URL. */
 export async function createBoard(page: Page, title: string): Promise<string> {
-  await page.getByRole('button', { name: 'Create board' }).click();
-  await page.getByLabel('Board title').fill(title);
-  await page.getByRole('button', { name: 'Create', exact: true }).click();
+  await page.getByRole('button', { name: 'Crear tablero', exact: true }).click();
+  await page.getByLabel('Título del tablero').fill(title);
+  await page.getByRole('button', { name: 'Crear', exact: true }).click();
   await expect(page).toHaveURL(/\/boards\/[^/]+$/);
   return new URL(page.url()).pathname.split('/').pop()!;
 }
@@ -43,10 +43,10 @@ export async function createBoard(page: Page, title: string): Promise<string> {
 export async function addList(page: Page, title: string): Promise<void> {
   // Trello-style, the composer stays open after adding so you can keep going, which
   // means the trigger button is only on screen for the first list.
-  const trigger = page.getByRole('button', { name: '+ Add another list' });
+  const trigger = page.getByRole('button', { name: '+ Añadir otra lista' });
   if (await trigger.isVisible()) await trigger.click();
-  await page.getByPlaceholder('Enter list title').fill(title);
-  await page.getByRole('button', { name: 'Add list' }).click();
+  await page.getByPlaceholder('Título de la lista').fill(title);
+  await page.getByRole('button', { name: 'Añadir lista' }).click();
   await expect(page.getByRole('heading', { name: title })).toBeVisible();
 }
 
@@ -56,10 +56,10 @@ export function listColumn(page: Page, title: string) {
 
 export async function addCard(page: Page, listTitle: string, cardTitle: string): Promise<void> {
   const column = listColumn(page, listTitle);
-  const trigger = column.getByRole('button', { name: '+ Add a card' });
+  const trigger = column.getByRole('button', { name: '+ Añadir una tarjeta' });
   if (await trigger.isVisible()) await trigger.click();
-  await column.getByPlaceholder('Enter a title for this card').fill(cardTitle);
-  await column.getByRole('button', { name: 'Add card' }).click();
+  await column.getByPlaceholder('Título de la tarjeta').fill(cardTitle);
+  await column.getByRole('button', { name: 'Añadir tarjeta' }).click();
   await expect(column.getByText(cardTitle, { exact: true })).toBeVisible();
 }
 

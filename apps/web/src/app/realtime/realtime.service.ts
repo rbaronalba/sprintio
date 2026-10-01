@@ -14,7 +14,16 @@ export interface StreamMessage {
   createdAt: string;
   /** True when this message also created a notification for the current user. */
   notified: boolean;
+  /** The tab whose request caused it (null for anything else). */
+  clientId: string | null;
 }
+
+/**
+ * This tab's id, sent as X-Client-Id on every API call and echoed on the live events those
+ * calls cause. A tab skips its own echoes (already applied optimistically); the same
+ * user's other tabs don't, so they stay in sync.
+ */
+export const CLIENT_ID = crypto.randomUUID();
 
 const BASE_RETRY_MS = 1000;
 const MAX_RETRY_MS = 30_000;

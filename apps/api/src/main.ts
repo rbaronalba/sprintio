@@ -2,7 +2,9 @@ import cookieParser from 'cookie-parser';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module.js';
-import { UPLOAD_DIR } from './cards/uploads.js';
+import { extname } from 'node:path';
+import { IMAGE_EXTENSIONS, UPLOAD_DIR } from './cards/uploads.js';
+import { requestContextMiddleware } from './common/request-context.js';
 
 async function bootstrap() {
   // Without an explicit origin cors falls back to '*', which silently defeats credentialed CORS.
@@ -15,9 +17,18 @@ async function bootstrap() {
   // No reason to advertise the framework to anyone fingerprinting the API.
   app.disable('x-powered-by');
   app.use(cookieParser());
+  app.use(requestContextMiddleware);
   app.enableCors({ origin: process.env.WEB_ORIGIN, credentials: true });
   // Attachment filenames are random (see uploads.ts): knowing the URL is what grants access, same as invite links.
-  app.useStaticAssets(UPLOAD_DIR, { prefix: '/uploads/' });
+  app.useStaticAssets(UPLOAD_DIR, {
+    prefix: '/uploads/',
+    setHeaders: (res, path) => {
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      // Only images render in the browser. Everything else (an .xml, a .pdf with script)
+      // downloads, so an uploaded file can never run as a page on this origin.
+      if (!IMAGE_EXTENSIONS.has(extname(path).toLowerCase())) res.setHeader('Content-Disposition', 'attachment');
+    },
+  });
   await app.listen(process.env.PORT ?? 3000);
 }
 await bootstrap();

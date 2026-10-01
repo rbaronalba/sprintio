@@ -1,6 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { Observable, Subject, filter, from, map, switchMap } from 'rxjs';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { randomUUID } from 'node:crypto';
+import { REDIS, type RedisClients } from '../redis/redis.module.js';
+import { requestContext } from '../common/request-context.js';
+import { mailEnabled, mailSubject, sendMail } from './mail.js';
+
+/** Every api instance publishes here and every instance feeds its own SSE clients from it. */
+const CHANNEL = 'sprintio:events';
 
 export type EventType =
   | 'CARD_CREATED'
@@ -26,7 +33,12 @@ export type EventType =
   | 'BOARD_CREATED'
   | 'MEMBER_REMOVED'
   | 'BACKGROUND_CHANGED'
-  | 'BOARD_RENAMED';
+  | 'BOARD_RENAMED'
+  | 'OWNER_CHANGED'
+  // Live-only (never stored, never in a feed): tell open boards to re-read positions.
+  | 'CARD_REORDERED'
+  | 'LIST_REORDERED'
+  | 'BOARD_REORDERED';
 
 export interface RecordInput {
   type: EventType;
@@ -37,6 +49,8 @@ export interface RecordInput {
   data?: Record<string, unknown>;
   /** Users to notify. The actor is always dropped: you don't get notified of your own doing. */
   notify?: string[];
+  /** Push to open boards only: no Event row, no notifications, nothing in any feed. */
+  live?: boolean;
 }
 
 interface BusMessage {
@@ -49,6 +63,8 @@ interface BusMessage {
   data: Record<string, unknown>;
   createdAt: string;
   recipients: string[];
+  /** The browser tab whose request caused this, so it can skip its own echo. */
+  clientId: string | null;
 }
 
 /** What a subscriber actually receives: the bus message minus the recipient list. */
@@ -57,9 +73,24 @@ export type StreamMessage = Omit<BusMessage, 'recipients'> & { notified: boolean
 @Injectable()
 export class EventsService {
   private readonly logger = new Logger(EventsService.name);
+  /** This instance's copy of the stream. With Redis, fed only by the channel (our own publishes included). */
   private readonly bus = new Subject<BusMessage>();
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() @Inject(REDIS) private readonly redis: RedisClients | null = null,
+  ) {
+    if (!redis) return;
+    void redis.sub.subscribe(CHANNEL);
+    redis.sub.on('message', (channel, raw) => {
+      if (channel === CHANNEL) this.bus.next(JSON.parse(raw) as BusMessage);
+    });
+  }
+
+  private async publish(message: BusMessage): Promise<void> {
+    if (this.redis) await this.redis.cmd.publish(CHANNEL, JSON.stringify(message));
+    else this.bus.next(message);
+  }
 
   /**
    * Persists an activity event, fans out notifications, and pushes it to live subscribers.
@@ -68,7 +99,22 @@ export class EventsService {
    * failure here must not turn a successful request into a 500. It logs and moves on.
    */
   async record(input: RecordInput): Promise<void> {
+    const clientId = requestContext.getStore()?.clientId ?? null;
     try {
+      if (input.live) {
+        return await this.publish({
+          id: randomUUID(),
+          type: input.type,
+          boardId: input.boardId,
+          cardId: input.cardId ?? null,
+          actorId: input.actorId,
+          actorEmail: '',
+          data: input.data ?? {},
+          createdAt: new Date().toISOString(),
+          recipients: [],
+          clientId,
+        });
+      }
       const event = await this.prisma.event.create({
         data: {
           type: input.type,
@@ -77,7 +123,7 @@ export class EventsService {
           actorId: input.actorId,
           data: (input.data ?? {}) as object,
         },
-        include: { actor: { select: { email: true } } },
+        include: { actor: { select: { email: true, displayName: true } } },
       });
 
       const recipients = [...new Set(input.notify ?? [])].filter((id) => id !== input.actorId);
@@ -86,9 +132,12 @@ export class EventsService {
           data: recipients.map((userId) => ({ userId, eventId: event.id })),
           skipDuplicates: true,
         });
+        // Not awaited: a slow SMTP server must not slow the request that caused this.
+        const subject = mailSubject(input.type, event.actor.displayName || event.actor.email, input.data ?? {});
+        if (mailEnabled && subject) void this.email(recipients, subject, event.boardId, event.cardId);
       }
 
-      this.bus.next({
+      await this.publish({
         id: event.id,
         type: input.type,
         boardId: event.boardId,
@@ -98,9 +147,23 @@ export class EventsService {
         data: (event.data ?? {}) as Record<string, unknown>,
         createdAt: event.createdAt.toISOString(),
         recipients,
+        clientId,
       });
     } catch (error) {
       this.logger.error(`Failed to record ${input.type} on board ${input.boardId}`, error);
+    }
+  }
+
+  private async email(userIds: string[], subject: string, boardId: string, cardId: string | null): Promise<void> {
+    try {
+      const users = await this.prisma.user.findMany({
+        where: { id: { in: userIds }, disabledAt: null },
+        select: { email: true },
+      });
+      const link = `${process.env.WEB_ORIGIN}/boards/${boardId}${cardId ? `?card=${cardId}` : ''}`;
+      await Promise.all(users.map((u) => sendMail(u.email, subject, `${subject}\n\n${link}`)));
+    } catch (error) {
+      this.logger.error(`Failed to email "${subject}"`, error);
     }
   }
 

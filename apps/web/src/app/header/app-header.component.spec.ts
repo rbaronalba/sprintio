@@ -41,7 +41,7 @@ describe('AppHeaderComponent', () => {
 
   it('shows the initials of the signed-in user in the account button', () => {
     fixture.detectChanges();
-    const avatar: HTMLElement = fixture.nativeElement.querySelector('button[aria-label="Account"]');
+    const avatar: HTMLElement = fixture.nativeElement.querySelector('button[aria-label="Cuenta"]');
     expect(avatar.textContent?.trim()).toBe('DD');
   });
 

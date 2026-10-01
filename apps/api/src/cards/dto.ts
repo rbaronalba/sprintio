@@ -1,8 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
 
-// Floats lose ordering precision when they grow or get bisected without bound.
-const MAX_POSITION = 1e9;
-
 function parseDateString(value: unknown, field: string): Date {
   const parsed = new Date(value as string);
   if (typeof value !== 'string' || Number.isNaN(parsed.getTime())) {
@@ -17,12 +14,13 @@ export interface UpsertCardInput {
   dueDate?: Date | null;
   dueDone?: boolean;
   archived?: boolean;
-  position?: number;
+  /** A move: land right after this card (null = top). The server works out the position. */
+  afterId?: string | null;
   listId?: string;
 }
 
 export function parseUpsertCard(body: unknown): UpsertCardInput {
-  const { title, description, dueDate, dueDone, archived, position, listId } = (body ?? {}) as Record<
+  const { title, description, dueDate, dueDone, archived, afterId, listId } = (body ?? {}) as Record<
     string,
     unknown
   >;
@@ -66,11 +64,11 @@ export function parseUpsertCard(body: unknown): UpsertCardInput {
   // flag on a card with no due date is meaningless.
   if (result.dueDate === null) result.dueDone = false;
 
-  if (position !== undefined) {
-    if (typeof position !== 'number' || !Number.isFinite(position) || Math.abs(position) > MAX_POSITION) {
-      throw new BadRequestException(`Position must be a number within ±${MAX_POSITION}`);
+  if (afterId !== undefined) {
+    if (afterId !== null && (typeof afterId !== 'string' || afterId.length === 0)) {
+      throw new BadRequestException('afterId must be an id or null');
     }
-    result.position = position;
+    result.afterId = afterId;
   }
 
   if (listId !== undefined) {
@@ -132,6 +130,22 @@ export function parseTimeEntry(body: unknown): UpsertTimeEntryInput {
     note: (note as string | undefined)?.trim() || undefined,
     userId: userId as string | undefined,
   };
+}
+
+export interface UpdateTimeEntryInput {
+  hours: number;
+  note: string | null;
+}
+
+export function parseTimeEntryUpdate(body: unknown): UpdateTimeEntryInput {
+  const { hours, note } = (body ?? {}) as Record<string, unknown>;
+  if (typeof hours !== 'number' || !Number.isFinite(hours) || hours <= 0 || hours > 24) {
+    throw new BadRequestException('Hours must be a number between 0 and 24');
+  }
+  if (note !== undefined && note !== null && (typeof note !== 'string' || note.length > 200)) {
+    throw new BadRequestException('Note must be a string of at most 200 characters');
+  }
+  return { hours, note: (note as string | null | undefined)?.trim() || null };
 }
 
 export function parseChecklistText(body: unknown): string {

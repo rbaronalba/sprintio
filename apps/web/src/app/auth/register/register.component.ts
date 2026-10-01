@@ -2,11 +2,10 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../auth.service';
-import { ThemeToggleComponent } from '../../theme-toggle/theme-toggle.component';
 
 @Component({
   selector: 'app-register',
-  imports: [ReactiveFormsModule, RouterLink, ThemeToggleComponent],
+  imports: [ReactiveFormsModule, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './register.component.html',
   styleUrl: './register.component.scss',
@@ -40,7 +39,7 @@ export class RegisterComponent {
       },
       error: (err) => {
         this.pending.set(false);
-        this.error.set(err.status === 409 ? 'That email is already registered' : 'Sign up failed');
+        this.error.set(err.status === 409 ? 'Ese correo ya está registrado' : 'No se pudo crear la cuenta');
       },
     });
   }

@@ -9,7 +9,7 @@ export interface ActivityLike {
 }
 
 export function actorName(actor: ActivityActor | null | undefined): string {
-  if (!actor) return 'Someone';
+  if (!actor) return 'Alguien';
   return actor.displayName?.trim() || actor.email;
 }
 
@@ -29,53 +29,55 @@ export function describeEvent(event: ActivityLike): string {
 
   switch (event.type) {
     case 'CARD_CREATED':
-      return `added ${card} to ${list}`;
+      return `añadió ${card} a ${list}`;
     case 'CARD_MOVED':
-      return `moved ${card} from ${str(d, 'from')} to ${str(d, 'to')}`;
+      return `movió ${card} de ${str(d, 'from')} a ${str(d, 'to')}`;
     case 'CARD_UPDATED':
-      return `updated ${card}`;
+      return `actualizó ${card}`;
     case 'CARD_DELETED':
-      return `deleted ${card}`;
+      return `eliminó ${card}`;
     case 'CARD_ASSIGNED':
-      return `assigned you to ${card}`;
+      return `te asignó a ${card}`;
     case 'CARD_UNASSIGNED':
-      return `removed an assignee from ${card}`;
+      return `quitó a un asignado de ${card}`;
     case 'LABEL_ADDED':
-      return `added the ${str(d, 'labelName') || 'label'} label to ${card}`;
+      return `añadió la etiqueta ${str(d, 'labelName')} a ${card}`;
     case 'LABEL_REMOVED':
-      return `removed the ${str(d, 'labelName') || 'label'} label from ${card}`;
+      return `quitó la etiqueta ${str(d, 'labelName')} de ${card}`;
     case 'COMMENT_ADDED':
-      return `commented on ${card}: ${str(d, 'excerpt')}`;
+      return `comentó en ${card}: ${str(d, 'excerpt')}`;
     case 'COMMENT_DELETED':
-      return `deleted a comment on ${card}`;
+      return `eliminó un comentario en ${card}`;
     case 'ATTACHMENT_ADDED':
-      return `attached ${str(d, 'name')} to ${card}`;
+      return `adjuntó ${str(d, 'name')} a ${card}`;
     case 'ATTACHMENT_DELETED':
-      return `removed ${str(d, 'name')} from ${card}`;
+      return `quitó ${str(d, 'name')} de ${card}`;
     case 'TIME_LOGGED':
-      return `logged ${d['hours']}h on ${card}`;
+      return `registró ${d['hours']}h en ${card}`;
     case 'CHECKLIST_ADDED':
-      return `added a checklist item to ${card}`;
+      return `añadió un elemento al checklist de ${card}`;
     case 'CHECKLIST_TOGGLED':
-      return `${d['done'] ? 'checked' : 'unchecked'} a checklist item on ${card}`;
+      return `${d['done'] ? 'marcó' : 'desmarcó'} un elemento del checklist de ${card}`;
     case 'CHECKLIST_DELETED':
-      return `removed a checklist item from ${card}`;
+      return `quitó un elemento del checklist de ${card}`;
     case 'LIST_CREATED':
-      return `added the list ${list}`;
+      return `añadió la lista ${list}`;
     case 'LIST_UPDATED':
-      return `renamed ${str(d, 'from')} to ${list}`;
+      return `renombró ${str(d, 'from')} a ${list}`;
     case 'LIST_DELETED':
-      return `deleted the list ${list}`;
+      return `eliminó la lista ${list}`;
     case 'BOARD_RENAMED':
-      return `renamed the board ${str(d, 'from')} to ${str(d, 'boardTitle')}`;
+      return `renombró el tablero ${str(d, 'from')} a ${str(d, 'boardTitle')}`;
+    case 'OWNER_CHANGED':
+      return `hizo a ${str(d, 'email')} administrador de ${str(d, 'boardTitle')}`;
     case 'BOARD_CREATED':
-      return `created ${str(d, 'boardTitle')}`;
+      return `creó ${str(d, 'boardTitle')}`;
     case 'MEMBER_JOINED':
-      return `joined ${str(d, 'boardTitle')}`;
+      return `se unió a ${str(d, 'boardTitle')}`;
     case 'MEMBER_REMOVED':
       return d['left']
-        ? `left ${str(d, 'boardTitle')}`
-        : `removed ${str(d, 'email')} from ${str(d, 'boardTitle')}`;
+        ? `salió de ${str(d, 'boardTitle')}`
+        : `quitó a ${str(d, 'email')} de ${str(d, 'boardTitle')}`;
     default:
       // A new server event type should read as something, not vanish.
       return event.type.toLowerCase().replace(/_/g, ' ');
@@ -84,7 +86,7 @@ export function describeEvent(event: ActivityLike): string {
 
 export function relativeTime(iso: string): string {
   const seconds = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
-  if (seconds < 60) return 'just now';
+  if (seconds < 60) return 'ahora mismo';
   // [how many of the current unit make one of the next, what the next unit is]
   const units: [number, Intl.RelativeTimeFormatUnit][] = [
     [60, 'hour'],
@@ -100,5 +102,5 @@ export function relativeTime(iso: string): string {
     value /= size;
     unit = next;
   }
-  return new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' }).format(-Math.round(value), unit);
+  return new Intl.RelativeTimeFormat('es', { numeric: 'auto' }).format(-Math.round(value), unit);
 }

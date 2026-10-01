@@ -44,7 +44,7 @@ ok('board activity includes list creation',(await call('GET',`/boards/${board.id
 
 // --- a reorder is not feed noise ---
 const before=(await call('GET',`/cards/${card.id}/activity`,A.t)).j.length;
-await call('PATCH',`/cards/${card.id}`,A.t,{position:1500});
+await call('PATCH',`/cards/${card.id}`,A.t,{afterId:null});
 ok('a pure reorder records nothing',(await call('GET',`/cards/${card.id}/activity`,A.t)).j.length===before);
 
 // --- notifications: assignment ---

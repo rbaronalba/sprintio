@@ -4,10 +4,10 @@ import { parseUpsertCard } from './dto.js';
 import { CardsService } from './cards.service.js';
 
 describe('card limits', () => {
-  it('rejects out-of-range and non-finite positions', () => {
-    expect(() => parseUpsertCard({ position: 1e12 })).toThrow(BadRequestException);
-    expect(() => parseUpsertCard({ position: Infinity })).toThrow(BadRequestException);
-    expect(parseUpsertCard({ position: 1500 }).position).toBe(1500);
+  it('takes a move as afterId (an id or null), never a client-computed position', () => {
+    expect(() => parseUpsertCard({ afterId: 42 })).toThrow(BadRequestException);
+    expect(parseUpsertCard({ afterId: null })).toEqual({ afterId: null });
+    expect(parseUpsertCard({ position: 1500 })).toEqual({});
   });
 
   it('refuses a new card when the list is full', async () => {

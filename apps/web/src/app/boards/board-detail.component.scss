@@ -245,6 +245,9 @@ main {
 }
 
 .card {
+  // Off-screen cards skip layout and paint; the browser remembers each one's last size.
+  content-visibility: auto;
+  contain-intrinsic-size: auto 64px;
   position: relative;
   display: flex;
   align-items: flex-start;
@@ -286,22 +289,6 @@ main {
 
 /* A colored rectangle sized to its own name (not a fixed-width pill) — long enough
    that the label text is never clipped. */
-.label-chip {
-  display: inline-flex;
-  min-width: 40px;
-  min-height: 20px;
-  align-items: center;
-  width: max-content;
-  max-width: 100%;
-  padding: 2px var(--space-xxs);
-  border-radius: var(--radius-sm);
-  color: #ffffff;
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1.6;
-  overflow-wrap: anywhere;
-}
-
 .card-meta {
   display: flex;
   align-items: center;
@@ -315,10 +302,28 @@ main {
 }
 
 .card-tools {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xxxs);
   flex: none;
+}
+
+// Counters on the left, assignees bottom-right. Collapses when a card has neither.
+.card-foot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-xs);
+  margin-right: -36px; /* reclaim the room card-body keeps for the corner + and x */
+}
+
+.card-foot:not(:has(.card-meta > *, .avatar)) {
+  display: none;
+}
+
+.card-avatars {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-xxxs);
+  margin-left: auto;
 }
 
 .card-tool {
@@ -461,10 +466,21 @@ main {
   background: var(--canvas-elevated);
 }
 
-.add-list {
+// Reads as an empty list slot at rest (legible over any background); hover hints "fill me".
+.add-list,
+.add-list:hover {
   width: 280px;
   flex: 0 0 auto;
   border: 1px dashed var(--hairline);
+  background: var(--canvas-elevated);
+  color: var(--ink);
+  transition: border-color 120ms linear, color 120ms linear;
+}
+
+.add-list:hover {
+  border-style: solid;
+  border-color: var(--primary);
+  color: var(--primary);
 }
 
 .composer {
@@ -574,7 +590,13 @@ main {
   padding-inline-start: var(--space-sm);
 }
 
-.card-dialog-side .comment-list {
+.card-dialog-side .older-comments {
+  align-self: flex-start;
+  margin-bottom: var(--space-xs);
+  font-size: 13px;
+}
+
+.comment-list {
   flex: 1;
   overflow-y: auto;
 }
@@ -1057,6 +1079,12 @@ main {
   display: flex;
   align-items: center;
   gap: var(--space-xxs);
+}
+
+// .card-dialog input is width:100%, which would stretch the checkbox and crush the text.
+.checklist-item input[type='checkbox'] {
+  width: auto;
+  flex: none;
 }
 
 .checklist-item label {

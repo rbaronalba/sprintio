@@ -3,13 +3,13 @@ import { Router, RouterLink } from '@angular/router';
 import { Subject, debounceTime, distinctUntilChanged, switchMap, tap } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '../auth/auth.service';
-import { ThemeToggleComponent } from '../theme-toggle/theme-toggle.component';
+import { NotificationBellComponent } from '../realtime/notification-bell.component';
 import { Board, BoardsService, SearchHit, Workspace } from '../services/boards.service';
 import { avatarStyle, initials } from '../shared/avatar';
 
 @Component({
   selector: 'app-header',
-  imports: [RouterLink, ThemeToggleComponent],
+  imports: [RouterLink, NotificationBellComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './app-header.component.html',
   styleUrl: './app-header.component.scss',
@@ -129,6 +129,11 @@ export class AppHeaderComponent {
   openProfile(): void {
     this.menuOpen.set(false);
     this.profileDialog().nativeElement.showModal();
+  }
+
+  openAdmin(): void {
+    this.menuOpen.set(false);
+    void this.router.navigate(['/admin']);
   }
 
   saveProfile(displayName: string): void {

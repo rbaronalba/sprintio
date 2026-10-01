@@ -2,11 +2,11 @@ import { randomBytes } from 'node:crypto';
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { EventsService } from '../events/events.service.js';
-import { memberOf } from './access.js';
+import { MAX_MEMBERS_PER_BOARD, memberOf } from './access.js';
 
 const MAX_WORKSPACES_PER_USER = 20;
-// A department, not a company: well above a board's cap, since everyone joins every board.
-const MAX_MEMBERS_PER_WORKSPACE = 50;
+// A department, not a company. Same as a board's cap, since everyone joins every board.
+const MAX_MEMBERS_PER_WORKSPACE = MAX_MEMBERS_PER_BOARD;
 
 /**
  * Workspace membership is materialized: joining adds a BoardMember row for every board in
@@ -114,6 +114,15 @@ export class WorkspacesService {
       where: { workspaceId: ws.id, members: { none: { userId } } },
       select: { id: true, title: true },
     });
+    // A board can also have direct invitees, so it may be full even when the workspace isn't.
+    const counts = await this.prisma.boardMember.groupBy({
+      by: ['boardId'],
+      where: { boardId: { in: boards.map((b) => b.id) } },
+      _count: { _all: true },
+    });
+    if (counts.some((c) => c._count._all >= MAX_MEMBERS_PER_BOARD)) {
+      throw new BadRequestException('A board in this workspace is full');
+    }
     await this.prisma.$transaction([
       this.prisma.workspaceMember.create({ data: { workspaceId: ws.id, userId } }),
       this.prisma.boardMember.createMany({

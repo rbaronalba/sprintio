@@ -1,6 +1,12 @@
+# Dev: `docker compose up -d --build` → http://localhost:4200
+# Production: `docker compose --profile prod up -d --build` adds HTTPS and backups (docs/deploy.md).
+
+x-database-url: &database-url postgresql://sprintio:${POSTGRES_PASSWORD}@db:5432/sprintio?schema=public
+
 services:
   db:
     image: postgres:16
+    restart: unless-stopped
     environment:
       POSTGRES_USER: sprintio
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in your environment or a .env file}
@@ -15,36 +21,135 @@ services:
       timeout: 5s
       retries: 5
 
+  # Shared state for running more than one api instance: the live-event bus (pub/sub),
+  # rate-limit counters and open-stream counts. Ephemeral by design, so no volume.
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Applies pending Prisma migrations, then exits; the api only starts once it succeeded.
+  # The build stage, because the prisma CLI is a devDependency the runtime image leaves out.
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: build
+    command: pnpm --filter api exec prisma migrate deploy
+    environment:
+      # POSTGRES_PASSWORD must be URL-safe (letters/digits only): it is interpolated into this URL.
+      DATABASE_URL: *database-url
+    depends_on:
+      db:
+        condition: service_healthy
+
   api:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
     environment:
-      # POSTGRES_PASSWORD must be URL-safe (letters/digits only): it is interpolated into this URL.
-      DATABASE_URL: postgresql://sprintio:${POSTGRES_PASSWORD}@db:5432/sprintio?schema=public
+      DATABASE_URL: *database-url
       PORT: 3001
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in your environment or a .env file}
-      WEB_ORIGIN: http://localhost:4200
+      # The URL people open. Microsoft's redirect, CORS and the links in emails are built from it.
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:4200}
       # Registrations+logins per minute per IP. Defaults to the production value; raise
       # it only to run the e2e suite, which signs up a dozen accounts from one address.
       AUTH_RATE_LIMIT: ${AUTH_RATE_LIMIT:-10}
+      REDIS_URL: redis://redis:6379
+      # "Sign in with Microsoft" (Entra ID app registration). All three or none; the tenant
+      # must be the company's directory id. Redirect URI to register in Azure:
+      # <WEB_ORIGIN>/auth/microsoft/callback. When set, password self-registration is off.
+      MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID:-}
+      MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET:-}
+      MICROSOFT_TENANT_ID: ${MICROSOFT_TENANT_ID:-}
+      # Comma-separated emails that become ADMIN when they sign in (user management at /admin).
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      # Email notifications (assigned / removed from a card, card moved). Unset = no email.
+      # e.g. smtp://user:password@smtp.office365.com:587
+      SMTP_URL: ${SMTP_URL:-}
+      MAIL_FROM: ${MAIL_FROM:-Sprintio <sprintio@localhost>}
     ports:
       - '127.0.0.1:3001:3001'
     volumes:
       - uploads-data:/app/uploads
     depends_on:
-      db:
+      migrate:
+        condition: service_completed_successfully
+      redis:
         condition: service_healthy
 
   web:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    # Localhost only: from other machines the way in is caddy (HTTPS). nginx trusts the
+    # X-Forwarded-For it receives, which is safe only while nothing else can reach it.
     ports:
-      - '4200:80'
+      - '127.0.0.1:4200:80'
     depends_on:
       - api
+
+  # HTTPS in front of web. The session cookie is Secure in production, so plain http loses
+  # the session on reload and breaks Microsoft sign-in. Certificate setup: Caddyfile.
+  caddy:
+    image: caddy:2
+    profiles: [prod]
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./certs:/certs:ro
+      - caddy-data:/data
+    depends_on:
+      - web
+
+  # Nightly database dump + uploads archive into BACKUP_DIR, kept 14 days. Same disk as the
+  # app: copy BACKUP_DIR off this server too (restore steps in docs/deploy.md).
+  # ponytail: a sleep loop and a full uploads tar each night; move to cron + incremental
+  # (restic/rsync) if uploads grow past a few GB or the time of day matters.
+  backup:
+    image: postgres:16
+    profiles: [prod]
+    restart: unless-stopped
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - uploads-data:/uploads:ro
+      - ${BACKUP_DIR:-./backups}:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint:
+      - sh
+      - -c
+      - |
+        while true; do
+          d=$$(date +%F)
+          if pg_dump -h db -U sprintio -Fc sprintio > /backups/db-$$d.dump.part \
+            && mv /backups/db-$$d.dump.part /backups/db-$$d.dump \
+            && tar czf /backups/uploads-$$d.tar.gz -C /uploads .; then
+            echo "backup $$d ok"
+          else
+            echo "backup $$d FAILED" >&2
+          fi
+          find /backups -type f -mtime +14 -delete
+          sleep 86400
+        done
 
 volumes:
   db-data:
   uploads-data:
+  caddy-data:

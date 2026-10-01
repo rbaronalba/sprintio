@@ -1,9 +1,10 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { Role, User } from '../generated/prisma/client.js';
 import { hashPassword, needsRehash, verifyPassword } from './password.util.js';
+import type { MicrosoftIdentity } from './microsoft.js';
 
 // Every token we mint carries an audience, and every verifier demands the one it expects.
 // Without this all three are interchangeable bearer tokens: a refresh cookie or a
@@ -33,7 +34,11 @@ export interface RefreshPayload {
  * The profile the client renders. displayName is deliberately NOT in the JWT:
  * a token minted before a rename would keep serving the stale name for 15 minutes.
  */
-export type AuthUser = JwtPayload & { displayName: string | null };
+export type AuthUser = JwtPayload & {
+  displayName: string | null;
+  /** False for Microsoft-only accounts: the profile then has no password to change. */
+  hasPassword: boolean;
+};
 
 export interface AuthResult {
   accessToken: string;
@@ -48,6 +53,12 @@ const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 // Two tabs share one cookie jar: if both refresh at once, the loser presents the token the
 // winner just rotated out. Within this window that is a race, not a replay.
 const ROTATION_GRACE_MS = 10_000;
+/** Signed-in devices per user; signing in on one more quietly drops the oldest. */
+const MAX_SESSIONS_PER_USER = 10;
+/** Comma-separated emails made ADMIN when they sign in. */
+const ADMIN_EMAILS = new Set(
+  (process.env.ADMIN_EMAILS ?? '').toLowerCase().split(',').map((e) => e.trim()).filter(Boolean),
+);
 
 // Login always runs scrypt, even for an unknown email, so response time does not reveal
 // which emails have accounts.
@@ -79,13 +90,56 @@ export class AuthService {
     if (!user || !ok) throw new UnauthorizedException('Invalid credentials');
 
     // The only moment we hold the plaintext: upgrade hashes made with older parameters.
-    if (needsRehash(user.passwordHash)) {
+    if (needsRehash(user.passwordHash!)) {
       await this.prisma.user.update({
         where: { id: user.id },
         data: { passwordHash: await hashPassword(password) },
       });
     }
     return this.startSession(user);
+  }
+
+  /**
+   * The account for a verified Microsoft identity: the one already linked to it, else an
+   * existing account with that email (safe only because sign-in is pinned to the company
+   * tenant, see microsoft.ts), else a new passwordless one.
+   */
+  async signInWithMicrosoft({ oid, email, name }: MicrosoftIdentity): Promise<AuthResult> {
+    let user = await this.prisma.user.findUnique({ where: { microsoftId: oid } });
+    if (!user) {
+      const byEmail = await this.prisma.user.findUnique({ where: { email } });
+      // Already tied to a different Microsoft user: never re-point it silently.
+      if (byEmail?.microsoftId) throw new ConflictException('This email is linked to another Microsoft account');
+      if (byEmail) {
+        // Nobody verified that whoever registered this email owns it: from now on only Microsoft
+        // proves that, so the password and every session opened with it go.
+        user = await this.prisma.user.update({ where: { id: byEmail.id }, data: { microsoftId: oid, passwordHash: null } });
+        await this.prisma.session.deleteMany({ where: { userId: user.id } });
+      } else {
+        user = await this.prisma.user.create({ data: { email, displayName: name, microsoftId: oid } });
+      }
+    }
+    return this.startSession(user);
+  }
+
+  /**
+   * Needs the current password, even though the caller is signed in: a borrowed laptop
+   * must not be enough to lock the owner out. Signs out every other device, keeping the
+   * one the change was made from (named by its refresh cookie).
+   */
+  async changePassword(userId: string, current: string, next: string, refreshToken?: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException('Account no longer exists');
+    // 400, not 401: a 401 makes the web client treat it as an expired token and sign out.
+    if (!user.passwordHash) throw new BadRequestException('Esta cuenta inicia sesión con Microsoft');
+    if (!(await verifyPassword(current, user.passwordHash))) {
+      throw new BadRequestException('La contraseña actual no es correcta');
+    }
+    if (current === next) throw new BadRequestException('La nueva contraseña debe ser distinta');
+
+    await this.prisma.user.update({ where: { id: userId }, data: { passwordHash: await hashPassword(next) } });
+    const keep = refreshToken ? (await this.verifyRefresh(refreshToken).catch(() => null))?.sid : undefined;
+    await this.prisma.session.deleteMany({ where: { userId, ...(keep && { id: { not: keep } }) } });
   }
 
   async refresh(refreshToken: string): Promise<AuthResult> {
@@ -100,7 +154,7 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token expired');
     }
     const user = await this.prisma.user.findUnique({ where: { id: session.userId } });
-    if (!user) throw new UnauthorizedException('Account no longer exists');
+    if (!user || user.disabledAt) throw new UnauthorizedException('Account no longer exists');
 
     const presented = hashToken(refreshToken);
     const { token, hash } = await this.signRefresh(user.id, session.id);
@@ -154,6 +208,11 @@ export class AuthService {
   }
 
   private async startSession(user: User): Promise<AuthResult> {
+    if (user.disabledAt) throw new UnauthorizedException('This account is disabled');
+    // How the first admin comes to exist: nobody is there yet to promote them.
+    if (ADMIN_EMAILS.has(user.email) && user.role !== 'ADMIN') {
+      user = await this.prisma.user.update({ where: { id: user.id }, data: { role: 'ADMIN' } });
+    }
     // Housekeeping: a user's dead sessions go whenever they sign in again.
     await this.prisma.session.deleteMany({ where: { userId: user.id, expiresAt: { lt: new Date() } } });
     const session = await this.prisma.session.create({
@@ -165,6 +224,13 @@ export class AuthService {
     });
     const { token, hash } = await this.signRefresh(user.id, session.id);
     await this.prisma.session.update({ where: { id: session.id }, data: { tokenHash: hash } });
+    const oldest = await this.prisma.session.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: 'desc' },
+      skip: MAX_SESSIONS_PER_USER,
+      select: { id: true },
+    });
+    if (oldest.length) await this.prisma.session.deleteMany({ where: { id: { in: oldest.map((s) => s.id) } } });
     return this.result(user, token);
   }
 
@@ -183,13 +249,13 @@ export class AuthService {
       expiresIn: ACCESS_TOKEN_TTL,
       audience: ACCESS_AUDIENCE,
     });
-    return { accessToken, refreshToken, user: { ...payload, displayName: user.displayName } };
+    return { accessToken, refreshToken, user: this.toAuthUser(user) };
   }
 
   async profile(userId: string): Promise<AuthUser> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new UnauthorizedException('Account no longer exists');
-    return { sub: user.id, email: user.email, role: user.role, displayName: user.displayName };
+    return this.toAuthUser(user);
   }
 
   async updateProfile(userId: string, displayName: string | null): Promise<AuthUser> {
@@ -197,7 +263,17 @@ export class AuthService {
       where: { id: userId },
       data: { displayName },
     });
-    return { sub: user.id, email: user.email, role: user.role, displayName: user.displayName };
+    return this.toAuthUser(user);
+  }
+
+  private toAuthUser(user: User): AuthUser {
+    return {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      displayName: user.displayName,
+      hasPassword: user.passwordHash !== null,
+    };
   }
 }
 

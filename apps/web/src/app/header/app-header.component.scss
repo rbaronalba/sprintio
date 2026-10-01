@@ -213,6 +213,18 @@
   margin: var(--space-xxxs) 0 var(--space-xxs);
 }
 
+.pw-section {
+  margin-top: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--hairline);
+}
+
+.pw-link {
+  display: inline-block;
+  margin-top: var(--space-xxs);
+  text-decoration: none;
+}
+
 .dialog-actions {
   display: flex;
   gap: var(--space-xxs);

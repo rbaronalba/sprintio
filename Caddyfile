@@ -1,0 +1,12 @@
+# HTTPS front (docker compose --profile prod). DOMAIN comes from .env.
+#
+# DOMAIN is a public DNS name and ports 80/443 are reachable from the internet:
+#   nothing to do, Caddy gets a Let's Encrypt certificate and renews it.
+# DOMAIN only resolves inside the company network:
+#   put the certificate (full chain) and key in ./certs and uncomment the tls line.
+{$DOMAIN} {
+	# tls /certs/cert.pem /certs/key.pem
+	header Strict-Transport-Security "max-age=31536000"
+	# Server-sent events (/events/stream) are flushed as they come; no option needed.
+	reverse_proxy web:80
+}

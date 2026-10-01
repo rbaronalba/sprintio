@@ -14,23 +14,29 @@ function createPrismaMock() {
     Object.entries(where).every(([k, v]) =>
       v && typeof v === 'object' && 'lt' in v
         ? (s[k as keyof Session] as Date) < (v as { lt: Date }).lt
-        : s[k as keyof Session] === v,
+        : v && typeof v === 'object' && 'in' in v
+          ? (v as { in: unknown[] }).in.includes(s[k as keyof Session])
+          : v && typeof v === 'object' && 'not' in v
+            ? s[k as keyof Session] !== (v as { not: unknown }).not
+            : s[k as keyof Session] === v,
     );
 
   return {
     users,
     sessions,
     user: {
-      findUnique: async ({ where }: { where: { id?: string; email?: string } }) => {
+      findUnique: async ({ where }: { where: { id?: string; email?: string; microsoftId?: string } }) => {
         if (where.id) return users.get(where.id) ?? null;
+        if (where.microsoftId) return [...users.values()].find((u) => u.microsoftId === where.microsoftId) ?? null;
         return [...users.values()].find((u) => u.email === where.email) ?? null;
       },
-      create: async ({ data }: { data: { email: string; passwordHash: string } }) => {
+      create: async ({ data }: { data: { email: string; passwordHash?: string; microsoftId?: string } }) => {
         const user: User = {
           id: `user_${++seq}`,
           email: data.email,
           displayName: null,
-          passwordHash: data.passwordHash,
+          passwordHash: data.passwordHash ?? null,
+          microsoftId: data.microsoftId ?? null,
           role: 'DEVELOPER' as Role,
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -50,7 +56,7 @@ function createPrismaMock() {
         return s ? { ...s } : null;
       },
       create: async ({ data }: { data: Pick<Session, 'userId' | 'tokenHash' | 'expiresAt'> }) => {
-        const s: Session = { id: `s_${++seq}`, prevTokenHash: null, rotatedAt: null, createdAt: new Date(), ...data };
+        const s: Session = { id: `s_${++seq}`, prevTokenHash: null, rotatedAt: null, createdAt: new Date(Date.now() + seq), ...data };
         sessions.set(s.id, s);
         return s;
       },
@@ -61,6 +67,11 @@ function createPrismaMock() {
         hit.forEach((s) => Object.assign(s, data));
         return { count: hit.length };
       },
+      findMany: async ({ where, skip = 0 }: { where: { userId: string }; skip?: number }) =>
+        [...sessions.values()]
+          .filter((s) => s.userId === where.userId)
+          .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+          .slice(skip),
       deleteMany: async ({ where }: { where: Partial<Record<keyof Session, unknown>> }) => {
         const hit = [...sessions.values()].filter((s) => matches(s, where));
         hit.forEach((s) => sessions.delete(s.id));
@@ -149,6 +160,51 @@ describe('AuthService', () => {
     // Replaying the old token signals a stolen token: the whole session dies.
     await expect(service.refresh(firstToken!)).rejects.toThrow();
     await expect(service.refresh(secondToken!)).rejects.toThrow();
+  });
+
+  it('keeps at most 10 sessions per user, dropping the oldest', async () => {
+    await service.register('many@sprintio.test', 'password123', 'Many Devices');
+    for (let i = 0; i < 11; i++) await service.login('many@sprintio.test', 'password123');
+    const left = await prisma.session.findMany({ where: { userId: [...prisma.users.values()][0].id } });
+    expect(left).toHaveLength(10);
+  });
+
+  it('changes the password only with the current one, and signs out the other devices', async () => {
+    const here = await service.register('pw@sprintio.test', 'password123', 'Pw User');
+    const elsewhere = await service.login('pw@sprintio.test', 'password123');
+
+    await expect(service.changePassword(here.user.sub, 'wrong-password', 'new-password-1', here.refreshToken!)).rejects.toThrow(
+      'La contraseña actual no es correcta',
+    );
+    await service.changePassword(here.user.sub, 'password123', 'new-password-1', here.refreshToken!);
+
+    await expect(service.login('pw@sprintio.test', 'password123')).rejects.toThrow();
+    await expect(service.login('pw@sprintio.test', 'new-password-1')).resolves.toBeTruthy();
+    // This device keeps its session; the other one is signed out.
+    await expect(service.refresh(here.refreshToken!)).resolves.toBeTruthy();
+    await expect(service.refresh(elsewhere.refreshToken!)).rejects.toThrow();
+  });
+
+  it('signs in with Microsoft: links an existing email once, creates passwordless accounts otherwise', async () => {
+    const existing = await service.register('ana@company.com', 'password123', 'Ana');
+    const linked = await service.signInWithMicrosoft({ oid: 'oid-ana', email: 'ana@company.com', name: 'Ana' });
+    expect(linked.user.sub).toBe(existing.user.sub);
+    // Whoever registered the email first (maybe not Ana) loses the password and its sessions.
+    expect(linked.user.hasPassword).toBe(false);
+    await expect(service.login('ana@company.com', 'password123')).rejects.toThrow();
+    await expect(service.refresh(existing.refreshToken!)).rejects.toThrow();
+    await expect(service.refresh(linked.refreshToken!)).resolves.toBeTruthy();
+
+    const fresh = await service.signInWithMicrosoft({ oid: 'oid-bo', email: 'bo@company.com', name: 'Bo' });
+    expect(fresh.user.hasPassword).toBe(false);
+    // A Microsoft-only account has no password to log in with or change.
+    await expect(service.login('bo@company.com', 'anything-123')).rejects.toThrow();
+    await expect(service.changePassword(fresh.user.sub, 'x', 'new-password-1')).rejects.toThrow('inicia sesión con Microsoft');
+
+    // Same email, different Microsoft user: refused, not re-pointed.
+    await expect(service.signInWithMicrosoft({ oid: 'oid-other', email: 'ana@company.com', name: 'X' })).rejects.toThrow(
+      'another Microsoft account',
+    );
   });
 
   it('logs out only the device holding the cookie', async () => {

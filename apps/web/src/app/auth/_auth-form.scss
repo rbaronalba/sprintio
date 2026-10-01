@@ -10,13 +10,6 @@
   min-height: 100vh;
 }
 
-.corner-toggle {
-  position: absolute;
-  top: var(--space-xs);
-  right: var(--space-xs);
-  z-index: 1;
-}
-
 /* The cinema panel stands in for the brand's full-bleed hero photograph.
    Art-directed photography drops in here as a background-image. */
 .cinema {

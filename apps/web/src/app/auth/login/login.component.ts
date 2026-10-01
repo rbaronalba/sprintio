@@ -1,12 +1,19 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { catchError, map, of } from 'rxjs';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../auth.service';
-import { ThemeToggleComponent } from '../../theme-toggle/theme-toggle.component';
+
+/** What the api's Microsoft callback sends back in ?error= when it could not sign you in. */
+const MICROSOFT_ERRORS: Record<string, string> = {
+  microsoft: 'No se pudo completar el inicio de sesión con Microsoft. Inténtalo de nuevo.',
+  'microsoft-linked': 'Este correo ya está vinculado a otra cuenta de Microsoft.',
+};
 
 @Component({
   selector: 'app-login',
-  imports: [ReactiveFormsModule, RouterLink, ThemeToggleComponent],
+  imports: [ReactiveFormsModule, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './login.component.html',
   styleUrl: './login.component.scss',
@@ -17,7 +24,14 @@ export class LoginComponent {
   private readonly route = inject(ActivatedRoute);
 
   readonly pending = signal(false);
-  readonly error = signal<string | null>(null);
+  readonly error = signal<string | null>(MICROSOFT_ERRORS[this.route.snapshot.queryParamMap.get('error') ?? ''] ?? null);
+  readonly microsoft = toSignal(
+    this.auth.providers().pipe(
+      map((p) => p.microsoft),
+      catchError(() => of(false)),
+    ),
+    { initialValue: false },
+  );
 
   readonly form = inject(FormBuilder).nonNullable.group({
     email: ['', [Validators.required, Validators.email, Validators.maxLength(254)]],
@@ -38,7 +52,7 @@ export class LoginComponent {
       },
       error: () => {
         this.pending.set(false);
-        this.error.set('Invalid email or password');
+        this.error.set('Correo o contraseña incorrectos');
       },
     });
   }

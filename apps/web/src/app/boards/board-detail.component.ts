@@ -1,5 +1,5 @@
-import { ChangeDetectionStrategy, Component, ElementRef, HostListener, computed, inject, signal, viewChild } from '@angular/core';
-import { NgTemplateOutlet, TitleCasePipe } from '@angular/common';
+import { ChangeDetectionStrategy, Component, ElementRef, HostListener, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
   CdkDrag,
@@ -15,11 +15,10 @@ import { AppHeaderComponent } from '../header/app-header.component';
 import { avatarStyle, initials } from '../shared/avatar';
 import { backgroundStyle } from '../shared/background';
 import { AuthService } from '../auth/auth.service';
-import { RealtimeService } from '../realtime/realtime.service';
+import { CLIENT_ID, RealtimeService } from '../realtime/realtime.service';
 import { actorName, describeEvent, relativeTime } from '../realtime/activity';
-import { ActivityEntry, Board, BoardDetail, BoardsService, Label, Member } from '../services/boards.service';
-import { Attachment, BoardService, Card, ChecklistItem, Comment, List, TimeEntry } from '../services/board.service';
-import { positionAt } from '../shared/position';
+import { ActivityEntry, ArchivedCard, Board, BoardDetail, BoardsService, Label, Member } from '../services/boards.service';
+import { Attachment, BoardService, COMMENT_PAGE, Card, ChecklistItem, Comment, List, Moved, TimeEntry } from '../services/board.service';
 import { RichEditorComponent, RichPipe } from '../shared/rich-text';
 
 // Mirrors the fixed palette the API accepts (apps/api/src/boards/dto.ts): 5 columns x 6 rows.
@@ -39,7 +38,6 @@ export const LABEL_COLORS = [
     CdkDropList,
     CdkDrag,
     CdkDragHandle,
-    TitleCasePipe,
     NgTemplateOutlet,
     RichEditorComponent,
     RichPipe,
@@ -65,6 +63,8 @@ export class BoardDetailComponent {
   readonly board = signal<BoardDetail | null>(null);
   readonly members = computed(() => this.board()?.members ?? []);
   readonly labels = computed(() => this.board()?.labels ?? []);
+  /** For card faces: each card walks its own few labels instead of every label on the board. */
+  readonly labelById = computed(() => new Map(this.labels().map((l) => [l.id, l])));
   // Header avatars: four faces, then one "+N" button that opens the full member list.
   readonly shownMembers = computed(() => this.members().slice(0, 4));
   readonly hiddenMembers = computed(() => Math.max(0, this.members().length - 4));
@@ -87,7 +87,11 @@ export class BoardDetailComponent {
   readonly timeHours = signal('');
   readonly timeDate = signal('');
   readonly timeNote = signal('');
+  /** Set when the popover edits an existing entry instead of adding time. */
+  readonly editingEntry = signal<TimeEntry | null>(null);
   readonly comments = signal<Comment[]>([]);
+  /** The last page came back full, so there may be older comments to fetch. */
+  readonly moreComments = signal(false);
   readonly timeEntries = signal<TimeEntry[]>([]);
   /** Card-level images from before comments carried their own; read-only now. */
   readonly attachments = signal<Attachment[]>([]);
@@ -118,17 +122,19 @@ export class BoardDetailComponent {
   readonly renaming = signal<string | null>(null);
   readonly editing = signal<Card | null>(null);
   readonly editingTitle = signal(false);
-  // Local-only, not persisted: there's no CardFollower table. Add one if people actually
-  // want a notification when a card they follow (rather than are assigned to) changes.
-  private readonly followedCardIds = signal<ReadonlySet<string>>(new Set());
+  readonly archived = signal<ArchivedCard[]>([]);
   private readonly dialog = viewChild.required<ElementRef<HTMLDialogElement>>('cardDialog');
+  private readonly descField = viewChild('descField', { read: RichEditorComponent });
   /** `verb` replaces "delete" for actions that can be undone (removing a member, leaving). */
-  readonly pendingDelete = signal<{ name: string; note?: string; verb?: string; run: () => void } | null>(null);
+  readonly pendingDelete = signal<{ name: string; note?: string; verb?: string; label?: string; run: () => void } | null>(null);
   private readonly confirmDialog = viewChild.required<ElementRef<HTMLDialogElement>>('confirmDialog');
   private dragging = false;
   /** A remote change that arrived mid-drag, replayed once the drag finishes. */
   private refreshQueued = false;
   private readonly remoteChange = new Subject<void>();
+  /** Cards touched by remote events, re-fetched one by one after a short debounce. */
+  private readonly staleCardIds = new Set<string>();
+  private readonly remoteCardChange = new Subject<void>();
 
   readonly filterLabelIds = signal<ReadonlySet<string>>(new Set());
   readonly filterMemberIds = signal<ReadonlySet<string>>(new Set());
@@ -230,7 +236,7 @@ export class BoardDetailComponent {
       .pipe(
         // Our own actions are already applied optimistically; replaying them would
         // undo whatever the user typed in the meantime.
-        filter((message) => message.boardId === this.boardId && message.actorId !== this.currentUserId),
+        filter((message) => message.boardId === this.boardId && message.clientId !== CLIENT_ID),
         takeUntilDestroyed(),
       )
       .subscribe((message) => {
@@ -238,10 +244,19 @@ export class BoardDetailComponent {
           void this.router.navigate(['/home']);
           return;
         }
-        if (message.type.startsWith('MEMBER_') || message.type === 'BACKGROUND_CHANGED' || message.type === 'BOARD_RENAMED') {
+        if (message.type.startsWith('MEMBER_') || ['BACKGROUND_CHANGED', 'BOARD_RENAMED', 'OWNER_CHANGED'].includes(message.type)) {
           this.boardsApi.get(this.boardId).subscribe((board) => this.board.set(board));
         }
-        this.remoteChange.next();
+        // Card-level events (the vast majority) re-fetch just that card. List and board
+        // level ones are rare and change the shape of the board, so those reload it all.
+        if (message.type === 'CARD_DELETED' && message.cardId) {
+          this.removeCardLocally(message.cardId);
+        } else if (message.cardId) {
+          this.staleCardIds.add(message.cardId);
+          this.remoteCardChange.next();
+        } else {
+          this.remoteChange.next();
+        }
         // Refresh the open card's own panes too, so a comment from someone else
         // shows up without closing and reopening the modal.
         const open = this.editing();
@@ -251,6 +266,58 @@ export class BoardDetailComponent {
     this.remoteChange
       .pipe(debounceTime(300), takeUntilDestroyed())
       .subscribe(() => this.refreshBoard());
+    this.remoteCardChange
+      .pipe(debounceTime(300), takeUntilDestroyed())
+      .subscribe(() => this.refreshStaleCards());
+
+    // Events sent while the stream was down are gone for good: resync once it is back.
+    let dropped = false;
+    effect(() => {
+      const connected = this.realtime.connected();
+      if (!connected) dropped = untracked(this.lists).length > 0;
+      else if (dropped) {
+        dropped = false;
+        untracked(() => this.refreshBoard());
+      }
+    });
+  }
+
+  /** Re-fetches each card a remote event touched and slots it where the server says it is. */
+  private refreshStaleCards(): void {
+    // Mid-drag the ids just wait in the set; onDragEnd flushes them.
+    if (this.dragging) return;
+    const ids = [...this.staleCardIds];
+    this.staleCardIds.clear();
+    for (const id of ids) {
+      this.api.getCard(id).subscribe({
+        next: (card) => this.applyRemoteCard(card),
+        // Gone (deleted, or we lost access): drop it.
+        error: () => this.removeCardLocally(id),
+      });
+    }
+  }
+
+  private applyRemoteCard(fresh: Card): void {
+    if (fresh.archived) return this.removeCardLocally(fresh.id);
+    // A list we have never seen (created remotely a moment ago): cheaper to reload than to guess.
+    if (!this.lists().some((l) => l.id === fresh.listId)) return this.refreshBoard();
+    const { description: _, ...face } = fresh;
+    this.lists.update((lists) =>
+      lists.map((l) => {
+        const cards = l.cards.filter((c) => c.id !== fresh.id);
+        if (l.id !== fresh.listId) return cards.length === l.cards.length ? l : { ...l, cards };
+        cards.push(face);
+        return { ...l, cards: cards.sort((a, b) => a.position - b.position || (a.id < b.id ? -1 : 1)) };
+      }),
+    );
+    const open = this.editing();
+    // Keep the description the modal already has; the face never carries it.
+    if (open?.id === fresh.id) this.editing.set({ ...face, description: open.description });
+  }
+
+  private removeCardLocally(id: string): void {
+    this.lists.update((lists) => lists.map((l) => ({ ...l, cards: l.cards.filter((c) => c.id !== id) })));
+    if (this.editing()?.id === id) this.dialog().nativeElement.close();
   }
 
   /**
@@ -258,8 +325,8 @@ export class BoardDetailComponent {
    * from the event payload. One query, no reconciliation logic to get wrong against
    * the optimistic updates already in flight.
    *
-   * ponytail: full board refetch per remote change; if a busy board makes this chatty,
-   * narrow it to the affected list before reaching for a CRDT.
+   * Only for list/board level events, a reconnect or a failed move: card events go
+   * through refreshStaleCards.
    */
   private refreshBoard(): void {
     if (this.dragging) {
@@ -273,7 +340,7 @@ export class BoardDetailComponent {
       const open = this.editing();
       if (open) {
         const fresh = lists.flatMap((l) => l.cards).find((c) => c.id === open.id);
-        if (fresh) this.editing.set(fresh);
+        if (fresh) this.editing.set({ ...fresh, description: open.description });
         else this.dialog().nativeElement.close();
       }
     });
@@ -288,7 +355,10 @@ export class BoardDetailComponent {
   }
 
   private loadCardPanes(cardId: string): void {
-    this.api.listComments(cardId).subscribe((comments) => this.comments.set(comments));
+    this.api.listComments(cardId).subscribe((comments) => {
+      this.comments.set(comments);
+      this.moreComments.set(comments.length === COMMENT_PAGE);
+    });
     this.api.listTimeEntries(cardId).subscribe((entries) => this.timeEntries.set(entries));
     this.api.listAttachments(cardId).subscribe((attachments) => this.attachments.set(attachments));
     this.api.listChecklist(cardId).subscribe((items) => this.checklist.set(items));
@@ -332,9 +402,8 @@ export class BoardDetailComponent {
     moveItemInArray(lists, event.previousIndex, event.currentIndex);
     this.lists.set(lists);
 
-    const siblings = lists.filter((_, i) => i !== event.currentIndex);
-    const position = positionAt(siblings, event.currentIndex);
-    this.api.moveList(lists[event.currentIndex].id, position).subscribe();
+    const list = lists[event.currentIndex];
+    this.api.moveList(list.id, lists[event.currentIndex - 1]?.id ?? null).subscribe(this.afterMove(list));
   }
 
   dropCard(event: CdkDragDrop<Card[]>, targetList: List): void {
@@ -348,11 +417,25 @@ export class BoardDetailComponent {
     }
     this.lists.update((lists) => [...lists]);
 
-    const siblings = targetCards.filter((_, i) => i !== event.currentIndex);
-    const position = positionAt(siblings, event.currentIndex);
     const card = targetCards[event.currentIndex];
     card.listId = targetList.id;
-    this.api.moveCard(card.id, targetList.id, position).subscribe();
+    const afterId = targetCards[event.currentIndex - 1]?.id ?? null;
+    this.api.moveCard(card.id, targetList.id, afterId).subscribe(this.afterMove(card));
+  }
+
+  /**
+   * The server decides the position; adopt it so later local sorting agrees. If the gaps
+   * ran out it renumbered every sibling, and a rejected move (list full, deleted meanwhile)
+   * leaves this view wrong: both resync from the server.
+   */
+  private afterMove(item: { position: number }) {
+    return {
+      next: (moved: Moved) => {
+        item.position = moved.position;
+        if (moved.renumbered) this.refreshBoard();
+      },
+      error: () => this.refreshBoard(),
+    };
   }
 
   rename(list: List, input: HTMLInputElement): void {
@@ -374,7 +457,10 @@ export class BoardDetailComponent {
       this.dragging = false;
       if (this.refreshQueued) {
         this.refreshQueued = false;
+        this.staleCardIds.clear(); // the full reload covers them
         this.refreshBoard();
+      } else if (this.staleCardIds.size > 0) {
+        this.refreshStaleCards();
       }
     });
   }
@@ -391,6 +477,13 @@ export class BoardDetailComponent {
     this.pendingFile.set(null);
     this.loadCardPanes(card.id);
     this.dialog().nativeElement.showModal();
+    // The board payload has no descriptions; fetch this one and drop it into the editor.
+    this.api.getCard(card.id).subscribe((full) => {
+      if (this.editing()?.id !== card.id) return;
+      this.editing.set({ ...this.editing()!, description: full.description });
+      const editor = this.descField();
+      if (editor) editor.value = full.description ?? '';
+    });
   }
 
   /** Clears ?card= so closing the modal doesn't leave a URL that reopens it on reload. */
@@ -420,7 +513,9 @@ export class BoardDetailComponent {
     if (listId === card.listId) return;
     const target = this.lists().find((l) => l.id === listId);
     if (!target) return;
-    const position = positionAt(target.cards, target.cards.length);
+    const last = target.cards.at(-1);
+    // Provisional until the server answers with the real one.
+    const position = (last?.position ?? 0) + 1000;
     this.lists.update((lists) =>
       lists.map((l) => {
         if (l.id === card.listId) return { ...l, cards: l.cards.filter((c) => c.id !== card.id) };
@@ -429,12 +524,15 @@ export class BoardDetailComponent {
       }),
     );
     this.patchCardLocally(card.id, { listId, position });
-    this.api.moveCard(card.id, listId, position).subscribe();
+    this.api.moveCard(card.id, listId, last?.id ?? null).subscribe({
+      next: (moved) => (moved.renumbered ? this.refreshBoard() : this.patchCardLocally(card.id, { position: moved.position })),
+      error: () => this.refreshBoard(),
+    });
   }
 
   copyCard(card: Card): void {
-    this.api.createCard(card.listId, `${card.title} (copy)`).subscribe((copy) => {
-      const patch = { description: card.description };
+    this.api.createCard(card.listId, `${card.title} (copia)`).subscribe((copy) => {
+      const patch = { description: this.editing()?.id === card.id ? this.editing()!.description : null };
       this.api.updateCard(copy.id, patch).subscribe();
       this.lists.update((lists) =>
         lists.map((l) => (l.id === card.listId ? { ...l, cards: [...l.cards, { ...copy, ...patch }] } : l)),
@@ -442,12 +540,37 @@ export class BoardDetailComponent {
     });
   }
 
-  isFollowed(card: Card): boolean {
-    return this.followedCardIds().has(card.id);
+  openArchived(dialog: HTMLDialogElement): void {
+    this.boardsOpen.set(false);
+    this.boardsApi.listArchived(this.boardId).subscribe((cards) => this.archived.set(cards));
+    dialog.showModal();
   }
 
-  toggleFollow(card: Card): void {
-    this.followedCardIds.update((ids) => toggled(ids, card.id));
+  restoreCard(id: string): void {
+    this.api.updateCard(id, { archived: false }).subscribe(() => {
+      this.archived.update((cards) => cards.filter((c) => c.id !== id));
+      this.api.getCard(id).subscribe((card) => this.applyRemoteCard(card));
+    });
+  }
+
+  /** The date input's yyyy-mm-dd, in local time. */
+  dueInput(iso: string | null): string {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  setDue(card: Card, value: string): void {
+    // The end of the chosen day, local time: a card due today is not overdue until tomorrow.
+    const dueDate = value ? new Date(`${value}T23:59:59`).toISOString() : null;
+    this.api
+      .updateCard(card.id, { dueDate })
+      .subscribe(() => this.patchCardLocally(card.id, { dueDate, ...(!dueDate && { dueDone: false }) }));
+  }
+
+  toggleDueDone(card: Card): void {
+    const dueDone = !card.dueDone;
+    this.api.updateCard(card.id, { dueDone }).subscribe(() => this.patchCardLocally(card.id, { dueDone }));
   }
 
   async shareCard(card: Card): Promise<void> {
@@ -486,8 +609,9 @@ export class BoardDetailComponent {
   askRemoveMember(member: Member): void {
     this.pendingDelete.set({
       name: member.email,
-      verb: 'remove',
-      note: 'They lose access to this board and are unassigned from its cards.',
+      verb: 'quitar a',
+      label: 'Quitar',
+      note: 'Perderá el acceso a este tablero y se le quitará de sus tarjetas.',
       run: () =>
         this.boardsApi.removeMember(this.boardId, member.userId).subscribe(() => {
           this.board.update((b) => (b ? { ...b, members: b.members.filter((m) => m.userId !== member.userId) } : b));
@@ -502,13 +626,28 @@ export class BoardDetailComponent {
     this.confirmDialog().nativeElement.showModal();
   }
 
+  askMakeOwner(member: Member): void {
+    this.pendingDelete.set({
+      name: member.displayName || member.email,
+      verb: 'ceder este tablero a',
+      label: 'Hacer administrador',
+      note: 'Solo el administrador puede renombrar, compartir o eliminar el tablero. Seguirás en él como miembro.',
+      run: () =>
+        this.boardsApi
+          .transferOwnership(this.boardId, member.userId)
+          .subscribe(() => this.board.update((b) => (b ? { ...b, ownerId: member.userId, inviteToken: null } : b))),
+    });
+    this.confirmDialog().nativeElement.showModal();
+  }
+
   askLeave(): void {
     const me = this.currentUserId;
     if (!me) return;
     this.pendingDelete.set({
-      name: this.board()?.title ?? 'this board',
-      verb: 'leave',
-      note: 'You will need a new invite link to come back.',
+      name: this.board()?.title ?? 'este tablero',
+      verb: 'salir de',
+      label: 'Salir',
+      note: 'Necesitarás un nuevo enlace de invitación para volver.',
       run: () => this.boardsApi.removeMember(this.boardId, me).subscribe(() => void this.router.navigate(['/home'])),
     });
     this.confirmDialog().nativeElement.showModal();
@@ -665,13 +804,22 @@ export class BoardDetailComponent {
     });
   }
 
+  loadOlderComments(card: Card): void {
+    const oldest = this.comments()[0];
+    if (!oldest) return;
+    this.api.listComments(card.id, oldest.id).subscribe((older) => {
+      this.comments.update((comments) => [...older, ...comments]);
+      this.moreComments.set(older.length === COMMENT_PAGE);
+    });
+  }
+
   private bumpCounts(cardId: string, comments: number, attachments: number): void {
     this.lists.update((lists) =>
       lists.map((l) => ({
         ...l,
         cards: l.cards.map((c) =>
           c.id === cardId
-            ? { ...c, _count: { comments: c._count.comments + comments, attachments: c._count.attachments + attachments } }
+            ? { ...c, _count: { ...c._count, comments: c._count.comments + comments, attachments: c._count.attachments + attachments } }
             : c,
         ),
       })),
@@ -685,15 +833,12 @@ export class BoardDetailComponent {
     });
   }
 
-  totalHours(card: Card): number {
-    return card.timeEntries.reduce((sum, e) => sum + e.hours, 0);
-  }
-
-  openTime(button: HTMLElement, pop: HTMLElement): void {
-    this.timeMemberId.set(this.currentUserId ?? '');
-    this.timeHours.set('');
-    this.timeDate.set(new Date().toISOString().slice(0, 10));
-    this.timeNote.set('');
+  openTime(button: HTMLElement, pop: HTMLElement, entry?: TimeEntry): void {
+    this.editingEntry.set(entry ?? null);
+    this.timeMemberId.set(entry?.userId ?? this.currentUserId ?? '');
+    this.timeHours.set(entry ? String(entry.hours) : '');
+    this.timeDate.set(entry ? entry.date.slice(0, 10) : new Date().toISOString().slice(0, 10));
+    this.timeNote.set(entry?.note ?? '');
     pop.showPopover();
     this.placePopover(pop, button.getBoundingClientRect());
   }
@@ -704,34 +849,38 @@ export class BoardDetailComponent {
     return Number.isFinite(hours) && hours > 0 && hours <= 24 ? hours : null;
   }
 
-  addTimeEntry(card: Card, pop: HTMLElement): void {
+  saveTimeEntry(card: Card, pop: HTMLElement): void {
     const hours = this.timeHoursValue();
     const date = this.timeDate();
     if (hours === null || !date) return;
-    const userId = this.timeMemberId() || undefined;
-    this.api.addTimeEntry(card.id, date, hours, this.timeNote().trim() || undefined, userId).subscribe((entry) => {
-      this.timeEntries.update((entries) => [entry, ...entries]);
+    const note = this.timeNote().trim() || null;
+    const editing = this.editingEntry();
+    const request = editing
+      ? this.api.updateTimeEntry(card.id, editing.id, hours, note)
+      : this.api.addTimeEntry(card.id, date, hours, note ?? undefined, this.timeMemberId() || undefined);
+    request.subscribe((entry) => {
+      // Adding time to a day that already has some returns that same (merged) entry.
+      this.timeEntries.update((entries) => [entry, ...entries.filter((e) => e.id !== entry.id)].sort((a, b) => b.date.localeCompare(a.date)));
       pop.hidePopover();
-      // Via patchCardLocally so the modal's total updates too, not just the card face.
-      const current = this.lists().flatMap((l) => l.cards).find((c) => c.id === card.id) ?? card;
-      this.patchCardLocally(card.id, { timeEntries: [...current.timeEntries, { hours: entry.hours }] });
+      this.syncCardHours(card.id);
     });
   }
 
   removeTimeEntry(card: Card, entry: TimeEntry): void {
     this.api.removeTimeEntry(card.id, entry.id).subscribe(() => {
       this.timeEntries.update((entries) => entries.filter((e) => e.id !== entry.id));
-      // The card face only keeps bare hours (no id) for the total; drop one matching value.
-      const current = this.lists().flatMap((l) => l.cards).find((c) => c.id === card.id) ?? card;
-      const rest = [...current.timeEntries];
-      const i = rest.findIndex((h) => h.hours === entry.hours);
-      if (i !== -1) rest.splice(i, 1);
-      this.patchCardLocally(card.id, { timeEntries: rest });
+      this.syncCardHours(card.id);
     });
   }
 
+  /** The card face only keeps the total; recompute it from the modal's full list.
+   *  Via patchCardLocally so the modal's total updates too, not just the card face. */
+  private syncCardHours(cardId: string): void {
+    this.patchCardLocally(cardId, { hoursTotal: this.timeEntries().reduce((sum, e) => sum + e.hours, 0) });
+  }
+
   formatEntryDate(date: string): string {
-    return new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    return new Date(date).toLocaleDateString('es', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
   removeAttachment(card: Card, attachment: Attachment): void {
@@ -746,6 +895,11 @@ export class BoardDetailComponent {
         })),
       );
     });
+  }
+
+  /** Mirrors the API: only these are served inline, everything else downloads. */
+  isImage(attachment: { path: string }): boolean {
+    return /\.(png|jpe?g|gif|webp)$/.test(attachment.path);
   }
 
   attachmentUrl(attachment: { path: string }): string {
@@ -774,24 +928,13 @@ export class BoardDetailComponent {
     return true;
   }
 
-  checklistDone(card: Card): number {
-    return card.checklist.filter((i) => i.done).length;
-  }
-
   addChecklistItem(card: Card, input: HTMLInputElement): void {
     const text = input.value.trim();
     if (!text) return;
     this.api.addChecklistItem(card.id, text).subscribe((item) => {
       this.checklist.update((items) => [...items, item]);
       input.value = '';
-      this.lists.update((lists) =>
-        lists.map((l) => ({
-          ...l,
-          cards: l.cards.map((c) =>
-            c.id === card.id ? { ...c, checklist: [...c.checklist, { done: item.done }] } : c,
-          ),
-        })),
-      );
+      this.syncCardChecklist(card.id);
     });
   }
 
@@ -799,37 +942,30 @@ export class BoardDetailComponent {
     const done = !item.done;
     this.api.updateChecklistItem(card.id, item.id, { done }).subscribe(() => {
       this.checklist.update((items) => items.map((i) => (i.id === item.id ? { ...i, done } : i)));
-      this.lists.update((lists) =>
-        lists.map((l) => ({
-          ...l,
-          cards: l.cards.map((c) => {
-            if (c.id !== card.id) return c;
-            const i = c.checklist.findIndex((x) => x.done === item.done);
-            const checklist = [...c.checklist];
-            if (i !== -1) checklist[i] = { done };
-            return { ...c, checklist };
-          }),
-        })),
-      );
+      this.syncCardChecklist(card.id);
     });
   }
 
   removeChecklistItem(card: Card, item: ChecklistItem): void {
     this.api.removeChecklistItem(card.id, item.id).subscribe(() => {
       this.checklist.update((items) => items.filter((i) => i.id !== item.id));
-      this.lists.update((lists) =>
-        lists.map((l) => ({
-          ...l,
-          cards: l.cards.map((c) => {
-            if (c.id !== card.id) return c;
-            const checklist = [...c.checklist];
-            const i = checklist.findIndex((x) => x.done === item.done);
-            if (i !== -1) checklist.splice(i, 1);
-            return { ...c, checklist };
-          }),
-        })),
-      );
+      this.syncCardChecklist(card.id);
     });
+  }
+
+  /** Card face and modal counter both read the card's checklist totals; recompute them from the modal's full list. */
+  private syncCardChecklist(cardId: string): void {
+    const items = this.checklist();
+    const card = this.findCard(cardId);
+    if (!card) return;
+    this.patchCardLocally(cardId, {
+      checklistDone: items.filter((i) => i.done).length,
+      _count: { ...card._count, checklist: items.length },
+    });
+  }
+
+  private findCard(id: string): Card | undefined {
+    return this.lists().flatMap((l) => l.cards).find((c) => c.id === id);
   }
 
   // A completed due date is never overdue, however far in the past it is.
@@ -837,9 +973,8 @@ export class BoardDetailComponent {
     return !card.dueDone && card.dueDate !== null && new Date(card.dueDate).getTime() < Date.now();
   }
 
-  // <input type="date"> wants yyyy-mm-dd; the API gives back a full ISO timestamp.
   formatDueDate(dueDate: string): string {
-    return new Date(dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    return new Date(dueDate).toLocaleDateString('es', { month: 'short', day: 'numeric' });
   }
 
   openShare(): void {

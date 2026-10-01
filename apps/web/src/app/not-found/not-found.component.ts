@@ -9,9 +9,9 @@ import { RouterLink } from '@angular/router';
   template: `
     <main>
       <p class="code">404</p>
-      <h1>Page not found</h1>
-      <p class="note">The page you're looking for doesn't exist, or you don't have access to it.</p>
-      <a routerLink="/home" class="btn btn-primary">Go to Home</a>
+      <h1>Página no encontrada</h1>
+      <p class="note">La página que buscas no existe o no tienes acceso a ella.</p>
+      <a routerLink="/home" class="btn btn-primary">Ir al inicio</a>
     </main>
   `,
   styles: `

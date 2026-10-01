@@ -1,8 +1,11 @@
+import { randomUUID } from 'node:crypto';
 import {
   Body,
   Controller,
   Get,
   Header,
+  Inject,
+  Optional,
   Post,
   Query,
   Sse,
@@ -11,7 +14,8 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Throttle } from '@nestjs/throttler';
-import { Observable, finalize, interval, map, merge } from 'rxjs';
+import { Observable, finalize, interval, map, merge, tap } from 'rxjs';
+import { REDIS, type RedisClients } from '../redis/redis.module.js';
 import { EventsService } from './events.service.js';
 import { NotificationsService } from './notifications.service.js';
 import { JWT_ALGORITHM, STREAM_AUDIENCE, type JwtPayload } from '../auth/auth.service.js';
@@ -24,6 +28,8 @@ const TICKET_TTL = '60s';
 const HEARTBEAT_MS = 25_000;
 /** One tab each for a handful of boards is normal; hundreds is someone exhausting our sockets. */
 const MAX_STREAMS_PER_USER = 6;
+/** A stream whose instance stopped heartbeating (crashed, redeployed) stops counting after this. */
+const STREAM_STALE_MS = HEARTBEAT_MS * 3;
 
 interface SsePayload {
   data: Record<string, unknown>;
@@ -31,11 +37,13 @@ interface SsePayload {
 
 @Controller('events')
 export class EventsController {
+  /** Used only without Redis, where one process sees every stream anyway. */
   private readonly openStreams = new Map<string, number>();
 
   constructor(
     private readonly events: EventsService,
     private readonly jwt: JwtService,
+    @Optional() @Inject(REDIS) private readonly redis: RedisClients | null = null,
   ) {}
 
   /**
@@ -60,22 +68,44 @@ export class EventsController {
   async stream(@Query('ticket') ticket: string): Promise<Observable<SsePayload>> {
     const userId = await this.userFromTicket(ticket);
 
-    const open = this.openStreams.get(userId) ?? 0;
-    if (open >= MAX_STREAMS_PER_USER) {
-      throw new UnauthorizedException('Too many open streams');
-    }
-    this.openStreams.set(userId, open + 1);
+    const slot = await this.claimSlot(userId);
 
-    const heartbeat = interval(HEARTBEAT_MS).pipe(map(() => ({ data: { type: 'ping' } })));
+    const heartbeat = interval(HEARTBEAT_MS).pipe(
+      tap(() => void slot.touch()),
+      map(() => ({ data: { type: 'ping' } })),
+    );
     const events = this.events.streamFor(userId).pipe(map((message) => ({ data: { ...message } })));
 
-    return merge(events, heartbeat).pipe(
-      finalize(() => {
-        const remaining = (this.openStreams.get(userId) ?? 1) - 1;
-        if (remaining > 0) this.openStreams.set(userId, remaining);
-        else this.openStreams.delete(userId);
-      }),
-    );
+    return merge(events, heartbeat).pipe(finalize(() => void slot.release()));
+  }
+
+  /**
+   * Counts the user's open streams across every api instance: a Redis sorted set of
+   * stream id -> last heartbeat, so streams on an instance that died age out on their own.
+   */
+  private async claimSlot(userId: string): Promise<{ touch: () => Promise<unknown>; release: () => Promise<unknown> }> {
+    if (!this.redis) {
+      const open = this.openStreams.get(userId) ?? 0;
+      if (open >= MAX_STREAMS_PER_USER) throw new UnauthorizedException('Too many open streams');
+      this.openStreams.set(userId, open + 1);
+      return {
+        touch: async () => {},
+        release: async () => {
+          const remaining = (this.openStreams.get(userId) ?? 1) - 1;
+          if (remaining > 0) this.openStreams.set(userId, remaining);
+          else this.openStreams.delete(userId);
+        },
+      };
+    }
+    const redis = this.redis.cmd;
+    const key = `streams:${userId}`;
+    const id = randomUUID();
+    await redis.zremrangebyscore(key, '-inf', Date.now() - STREAM_STALE_MS);
+    // ponytail: count-then-add is not atomic, so a burst can overshoot the cap by a stream or two; it is a soft cap.
+    if ((await redis.zcard(key)) >= MAX_STREAMS_PER_USER) throw new UnauthorizedException('Too many open streams');
+    const touch = () => redis.multi().zadd(key, Date.now(), id).pexpire(key, STREAM_STALE_MS).exec();
+    await touch();
+    return { touch, release: () => redis.zrem(key, id) };
   }
 
   private async userFromTicket(ticket: string): Promise<string> {

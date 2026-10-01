@@ -50,6 +50,6 @@ describe('RegisterComponent', () => {
 
     fixture.detectChanges();
     const alert: HTMLElement = fixture.nativeElement.querySelector('[role="alert"]');
-    expect(alert.textContent).toContain('That email is already registered');
+    expect(alert.textContent).toContain('Ese correo ya está registrado');
   });
 });

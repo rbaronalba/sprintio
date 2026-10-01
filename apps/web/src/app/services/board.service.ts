@@ -42,16 +42,27 @@ export interface ChecklistItem {
 export interface Card {
   id: string;
   title: string;
-  description: string | null;
+  /** Only on a single-card fetch (GET /cards/:id): the board payload leaves it out to stay light. */
+  description?: string | null;
   dueDate: string | null;
   dueDone: boolean;
+  archived: boolean;
   assignees: { userId: string }[];
   labels: { labelId: string }[];
-  timeEntries: { hours: number }[];
-  checklist: { done: boolean }[];
-  _count: { comments: number; attachments: number };
+  hoursTotal: number;
+  checklistDone: number;
+  _count: { comments: number; attachments: number; checklist: number };
   position: number;
   listId: string;
+}
+
+/** Matches the API's page size: a full page means there may be more. */
+export const COMMENT_PAGE = 50;
+
+/** A move's answer: where it landed, and whether the gaps ran out and every sibling was renumbered. */
+export interface Moved {
+  position: number;
+  renumbered: boolean;
 }
 
 export interface List {
@@ -80,8 +91,9 @@ export class BoardService {
     return this.http.patch<List>(`/lists/${id}`, { title });
   }
 
-  moveList(id: string, position: number): Observable<List> {
-    return this.http.patch<List>(`/lists/${id}`, { position });
+  /** Lands the list right after `afterId` (null = first); the server picks the position. */
+  moveList(id: string, afterId: string | null): Observable<Moved> {
+    return this.http.patch<Moved>(`/lists/${id}`, { afterId });
   }
 
   /** A File uploads an image; a string sets a palette color, or '' clears it. */
@@ -114,8 +126,9 @@ export class BoardService {
     return this.http.get<ActivityEntry[]>(`/cards/${cardId}/activity`);
   }
 
-  moveCard(id: string, listId: string, position: number): Observable<Card> {
-    return this.http.patch<Card>(`/cards/${id}`, { listId, position });
+  /** Lands the card right after `afterId` (null = top) in `listId`; the server picks the position. */
+  moveCard(id: string, listId: string, afterId: string | null): Observable<Moved> {
+    return this.http.patch<Moved>(`/cards/${id}`, { listId, afterId });
   }
 
   removeCard(id: string): Observable<unknown> {
@@ -138,8 +151,9 @@ export class BoardService {
     return this.http.delete(`/cards/${cardId}/labels/${labelId}`);
   }
 
-  listComments(cardId: string): Observable<Comment[]> {
-    return this.http.get<Comment[]>(`/cards/${cardId}/comments`);
+  /** Oldest-first page of up to COMMENT_PAGE; `before` asks for the page older than that comment. */
+  listComments(cardId: string, before?: string): Observable<Comment[]> {
+    return this.http.get<Comment[]>(`/cards/${cardId}/comments`, { params: before ? { before } : {} });
   }
 
   /** With a file the comment is posted as multipart, the image attached to it. */
@@ -155,12 +169,20 @@ export class BoardService {
     return this.http.delete(`/cards/${cardId}/comments/${commentId}`);
   }
 
+  getCard(id: string): Observable<Card> {
+    return this.http.get<Card>(`/cards/${id}`);
+  }
+
   listTimeEntries(cardId: string): Observable<TimeEntry[]> {
     return this.http.get<TimeEntry[]>(`/cards/${cardId}/time`);
   }
 
   addTimeEntry(cardId: string, date: string, hours: number, note?: string, userId?: string): Observable<TimeEntry> {
     return this.http.post<TimeEntry>(`/cards/${cardId}/time`, { date, hours, note, userId });
+  }
+
+  updateTimeEntry(cardId: string, entryId: string, hours: number, note: string | null): Observable<TimeEntry> {
+    return this.http.patch<TimeEntry>(`/cards/${cardId}/time/${entryId}`, { hours, note });
   }
 
   removeTimeEntry(cardId: string, entryId: string): Observable<unknown> {

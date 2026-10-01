@@ -10,22 +10,22 @@ test('a registered user can log in and reach the dashboard', async ({ page }) =>
   const email = uniqueEmail();
 
   await page.goto('/register');
-  await page.getByLabel('First name').fill('Test');
-  await page.getByLabel('Last name').fill('Driver');
-  await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
-  await page.getByRole('button', { name: 'Create account' }).click();
+  await page.getByLabel('Nombre').fill('Test');
+  await page.getByLabel('Apellido').fill('Driver');
+  await page.getByLabel('Correo electrónico').fill(email);
+  await page.getByLabel('Contraseña').fill(password);
+  await page.getByRole('button', { name: 'Crear cuenta' }).click();
 
   await expect(page).toHaveURL(/\/home$/);
 
   // Log out so the login form itself is exercised, not just the signup redirect.
-  await page.getByRole('button', { name: 'Account' }).click();
-  await page.getByRole('button', { name: 'Log out' }).click();
+  await page.getByRole('button', { name: 'Cuenta' }).click();
+  await page.getByRole('button', { name: 'Cerrar sesión' }).click();
   await expect(page).toHaveURL(/\/login$/);
 
-  await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByLabel('Correo electrónico').fill(email);
+  await page.getByLabel('Contraseña').fill(password);
+  await page.getByRole('button', { name: 'Iniciar sesión' }).click();
 
   await expect(page).toHaveURL(/\/home$/);
   await expect(page.getByTestId('current-user')).toHaveText('Test Driver');
@@ -35,11 +35,11 @@ test('the session survives a page reload via the refresh cookie', async ({ page 
   const email = uniqueEmail();
 
   await page.goto('/register');
-  await page.getByLabel('First name').fill('Test');
-  await page.getByLabel('Last name').fill('Driver');
-  await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
-  await page.getByRole('button', { name: 'Create account' }).click();
+  await page.getByLabel('Nombre').fill('Test');
+  await page.getByLabel('Apellido').fill('Driver');
+  await page.getByLabel('Correo electrónico').fill(email);
+  await page.getByLabel('Contraseña').fill(password);
+  await page.getByRole('button', { name: 'Crear cuenta' }).click();
   await expect(page).toHaveURL(/\/home$/);
 
   // The access token only lives in memory, so this proves the refresh cookie works.
@@ -53,11 +53,11 @@ test('logging in with a wrong password shows an error and stays on the login pag
   page,
 }) => {
   await page.goto('/login');
-  await page.getByLabel('Email').fill(uniqueEmail());
-  await page.getByLabel('Password').fill('wrong-password');
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByLabel('Correo electrónico').fill(uniqueEmail());
+  await page.getByLabel('Contraseña').fill('wrong-password');
+  await page.getByRole('button', { name: 'Iniciar sesión' }).click();
 
-  await expect(page.getByRole('alert')).toHaveText('Invalid email or password');
+  await expect(page.getByRole('alert')).toHaveText('Correo o contraseña incorrectos');
   await expect(page).toHaveURL(/\/login$/);
 });
 

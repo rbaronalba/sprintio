@@ -10,7 +10,7 @@ const inv=(await call('POST',`/boards/${board.id}/invite`,A.t)).j;
 await call('POST',`/boards/join/${inv.token}`,Bo.t);
 const list=(await call('POST',`/boards/${board.id}/lists`,A.t,{title:'L'})).j;
 const card=(await call('POST',`/lists/${list.id}/cards`,A.t,{title:'C'})).j;
-ok('card create returns empty checklist[]',Array.isArray(card.checklist)&&card.checklist.length===0);
+ok('card create returns zero checklist totals',card._count.checklist===0&&card.checklistDone===0);
 
 ok('stranger cannot list checklist',(await call('GET',`/cards/${card.id}/checklist`,C.t)).s===404);
 ok('empty text rejected',(await call('POST',`/cards/${card.id}/checklist`,A.t,{text:'  '})).s===400);
@@ -30,7 +30,7 @@ ok('unknown item 400',(await call('PATCH',`/cards/${card.id}/checklist/nope`,A.t
 
 const lists1=(await call('GET',`/boards/${board.id}/lists`,A.t)).j;
 const faceCard=lists1[0].cards.find(c=>c.id===card.id);
-ok('card face carries checklist for counting',faceCard.checklist.filter(x=>x.done).length===1&&faceCard.checklist.length===2);
+ok('card face carries checklist totals',faceCard.checklistDone===1&&faceCard._count.checklist===2,faceCard);
 
 ok('any member can delete an item',(await call('DELETE',`/cards/${card.id}/checklist/${i1.id}`,Bo.t)).s===200);
 ok('item gone',(await call('GET',`/cards/${card.id}/checklist`,A.t)).j.length===1);

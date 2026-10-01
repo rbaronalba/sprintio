@@ -97,13 +97,13 @@ function toMarkdown(root: Node): string {
     @if (editing()) {
       <div class="rich">
         <div class="rich-bar" (mousedown)="$event.preventDefault()">
-          <button type="button" title="Bold" aria-label="Bold" (click)="cmd('bold')"><b>B</b></button>
-          <button type="button" title="Italic" aria-label="Italic" (click)="cmd('italic')"><i>I</i></button>
-          <button type="button" title="Strikethrough" aria-label="Strikethrough" (click)="cmd('strikeThrough')"><s>S</s></button>
-          <button type="button" title="Code" aria-label="Code" (click)="code()">&lt;&gt;</button>
+          <button type="button" title="Negrita" aria-label="Negrita" (click)="cmd('bold')"><b>B</b></button>
+          <button type="button" title="Cursiva" aria-label="Cursiva" (click)="cmd('italic')"><i>I</i></button>
+          <button type="button" title="Tachado" aria-label="Tachado" (click)="cmd('strikeThrough')"><s>S</s></button>
+          <button type="button" title="Código" aria-label="Código" (click)="code()">&lt;&gt;</button>
           <span class="rich-sep"></span>
-          <button type="button" title="Bulleted list" aria-label="Bulleted list" (click)="cmd('insertUnorderedList')">&#8226;</button>
-          <button type="button" title="Numbered list" aria-label="Numbered list" (click)="cmd('insertOrderedList')">1.</button>
+          <button type="button" title="Lista con viñetas" aria-label="Lista con viñetas" (click)="cmd('insertUnorderedList')">&#8226;</button>
+          <button type="button" title="Lista numerada" aria-label="Lista numerada" (click)="cmd('insertOrderedList')">1.</button>
           <span class="rich-end"><ng-content /></span>
         </div>
         <div #ed class="rich-ed rich-out" contenteditable="true" [style.min-height.px]="rows() * 21" (blur)="stop()"></div>

@@ -3,11 +3,13 @@ import { HttpErrorResponse, HttpInterceptorFn, HttpRequest } from '@angular/comm
 import { Router } from '@angular/router';
 import { catchError, switchMap, throwError } from 'rxjs';
 import { AuthService } from './auth.service';
+import { CLIENT_ID } from '../realtime/realtime.service';
 
 const AUTH_ENDPOINTS = ['/auth/login', '/auth/register', '/auth/refresh'];
 
 function withToken(req: HttpRequest<unknown>, token: string | null): HttpRequest<unknown> {
-  return token ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } }) : req;
+  // X-Client-Id comes back on the live events this request causes; see CLIENT_ID.
+  return req.clone({ setHeaders: { 'X-Client-Id': CLIENT_ID, ...(token && { Authorization: `Bearer ${token}` }) } });
 }
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {

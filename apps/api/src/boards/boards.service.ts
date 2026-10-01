@@ -1,13 +1,12 @@
 import { randomBytes } from 'node:crypto';
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { memberOf } from './access.js';
+import { MAX_MEMBERS_PER_BOARD, memberOf } from './access.js';
 import { EventsService } from '../events/events.service.js';
 import type { UpsertLabelInput } from './dto.js';
 import { removeUpload } from '../cards/uploads.js';
 
 const MAX_BOARDS_PER_USER = 100;
-const MAX_MEMBERS_PER_BOARD = 20;
 const MAX_LABELS_PER_BOARD = 20;
 const ACTIVITY_PAGE = 50;
 /** A search is a jump-to, not a report: more than this and you should be filtering a board. */
@@ -43,7 +42,7 @@ export class BoardsService {
       ? await this.prisma.workspace.findFirst({ where: { id: workspaceId, members: { some: { userId: ownerId } } } })
       : ((await this.prisma.workspace.findFirst({ where: { ownerId }, orderBy: { createdAt: 'asc' } })) ??
         (await this.prisma.workspace.create({
-          data: { name: 'My workspace', ownerId, members: { create: { userId: ownerId } } },
+          data: { name: 'Mi espacio de trabajo', ownerId, members: { create: { userId: ownerId } } },
         })));
     if (!ws) throw new NotFoundException('Workspace not found');
 
@@ -140,6 +139,34 @@ export class BoardsService {
     await removeUpload(board.background);
     await this.events.record({ type: 'BACKGROUND_CHANGED', boardId: id, actorId: userId, data: { title: board.title } });
     return { background };
+  }
+
+  /** The owner hands the board to another member (and stays on it as a plain member). */
+  async transfer(ownerId: string, id: string, targetId: string) {
+    const board = await this.findOwned(ownerId, id);
+    const member = await this.prisma.boardMember.findUnique({
+      where: { boardId_userId: { boardId: id, userId: targetId } },
+      include: { user: { select: { email: true } } },
+    });
+    if (!member) throw new BadRequestException('User is not a member of this board');
+    await this.prisma.board.update({ where: { id }, data: { ownerId: targetId } });
+    await this.events.record({
+      type: 'OWNER_CHANGED',
+      boardId: id,
+      actorId: ownerId,
+      data: { boardTitle: board.title, email: member.user.email },
+    });
+  }
+
+  /** ponytail: the 200 most recently archived, no paging; page it if a board ever archives more and needs the old ones. */
+  async listArchived(userId: string, boardId: string) {
+    await this.assertMember(userId, boardId);
+    return this.prisma.card.findMany({
+      where: { archived: true, list: { boardId } },
+      orderBy: { updatedAt: 'desc' },
+      take: 200,
+      select: { id: true, title: true, list: { select: { title: true } } },
+    });
   }
 
   async remove(ownerId: string, id: string) {

@@ -143,7 +143,7 @@ export class DashboardComponent {
   }
 
   askDelete(board: Board): void {
-    this.confirm(board.title, "All its lists and cards will be deleted too. This can't be undone.", () =>
+    this.confirm(board.title, 'También se eliminarán todas sus listas y tarjetas. Esta acción no se puede deshacer.', () =>
       this.boardsApi.remove(board.id).subscribe(() => {
         this.boards.update((boards) => boards.filter((b) => b.id !== board.id));
       }),
@@ -151,7 +151,7 @@ export class DashboardComponent {
   }
 
   askDeleteWorkspace(w: Workspace): void {
-    this.confirm(w.name, "Every board in this workspace, with all its lists and cards, will be deleted too. This can't be undone.", () =>
+    this.confirm(w.name, 'También se eliminarán todos los tableros de este espacio de trabajo, con sus listas y tarjetas. Esta acción no se puede deshacer.', () =>
       this.boardsApi.removeWorkspace(w.id).subscribe(() => {
         this.workspaces.update((list) => list.filter((x) => x.id !== w.id));
         this.boards.update((boards) => boards.filter((b) => b.workspaceId !== w.id));
@@ -210,10 +210,10 @@ export class DashboardComponent {
     const leaving = m.userId === this.auth.currentUser()?.sub;
     this.membersDialog().nativeElement.close();
     this.confirm(
-      leaving ? `leave ${w.name}` : `remove ${m.displayName || m.email} from ${w.name}`,
+      leaving ? `salir de ${w.name}` : `quitar a ${m.displayName || m.email} de ${w.name}`,
       leaving
-        ? "You'll lose access to its boards, except the ones you created."
-        : "They'll lose access to its boards, except the ones they created.",
+        ? 'Perderás el acceso a sus tableros, salvo los que hayas creado tú.'
+        : 'Perderá el acceso a sus tableros, salvo los que haya creado.',
       () =>
         this.boardsApi.removeWorkspaceMember(w.id, m.userId).subscribe(() => {
           if (!leaving) return;

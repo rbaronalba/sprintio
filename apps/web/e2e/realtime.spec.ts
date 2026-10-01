@@ -3,16 +3,16 @@ import { addCard, addList, createBoard, dragCardTo, listColumn, register, unique
 
 /** Opens the board's invite link and joins as a second, freshly registered user. */
 async function inviteSecondUser(owner: Page, browser: Browser, email: string) {
-  await owner.getByRole('button', { name: 'Share' }).click();
-  await owner.getByRole('button', { name: 'Create invite link' }).click();
-  const link = await owner.getByLabel('Invitation link').inputValue();
-  await owner.getByRole('button', { name: 'Close' }).click();
+  await owner.getByRole('button', { name: 'Compartir' }).click();
+  await owner.getByRole('button', { name: 'Crear enlace de invitación' }).click();
+  const link = await owner.getByLabel('Enlace de invitación').inputValue();
+  await owner.getByRole('button', { name: 'Cerrar' }).click();
 
   const guestContext = await browser.newContext();
   const guest = await guestContext.newPage();
   await register(guest, email, 'Guest Driver');
   await guest.goto(new URL(link).pathname);
-  await guest.getByRole('button', { name: /join/i }).click();
+  await guest.getByRole('button', { name: /unirse/i }).click();
   await expect(guest).toHaveURL(/\/boards\/[^/?]+/);
   return { guest, guestContext };
 }
@@ -56,15 +56,15 @@ test.describe('live collaboration', () => {
     await listColumn(owner, 'Setup')
       .locator('.card')
       .filter({ hasText: 'Fit the wet tyres' })
-      .getByRole('button', { name: /member/i })
+      .getByRole('button', { name: /miembros/i })
       .click();
     await owner.getByRole('button', { name: /Guest Driver/ }).click();
 
-    const bell = guest.getByRole('button', { name: /activity/i });
+    const bell = guest.getByRole('button', { name: /actividad/i });
     await expect(bell).toContainText('(1)', { timeout: 10_000 });
 
     await bell.click();
-    await guest.getByText(/assigned you to Fit the wet tyres/i).click();
+    await guest.getByText(/te asignó a Fit the wet tyres/i).click();
     // Following the notification lands on the board with that card's modal already open.
     await expect(guest.locator('.card-title-display')).toHaveText('Fit the wet tyres');
 
@@ -81,14 +81,42 @@ test.describe('live collaboration', () => {
     const { guest, guestContext } = await inviteSecondUser(owner, browser, guestEmail);
 
     await listColumn(owner, 'Strategy').getByText('Undercut on lap 20').click();
-    await owner.getByText('Insert your comment here').click();
+    await owner.getByText('Escribe tu comentario aquí').click();
     await owner.locator('.new-comment [contenteditable]').fill(`@${guestEmail} thoughts?`);
-    await owner.getByRole('button', { name: 'Comment' }).click();
+    await owner.getByRole('button', { name: 'Comentar' }).click();
 
-    await expect(guest.getByRole('button', { name: /activity/i })).toContainText('(1)', {
+    await expect(guest.getByRole('button', { name: /actividad/i })).toContainText('(1)', {
       timeout: 10_000,
     });
 
     await guestContext.close();
+  });
+
+  test('reordering within one list reaches the other member', async ({ page: owner, browser }) => {
+    await register(owner, uniqueEmail('reorder'));
+    await createBoard(owner, 'Suzuka');
+    await addList(owner, 'Grid');
+    await addCard(owner, 'Grid', 'First');
+    await addCard(owner, 'Grid', 'Second');
+    const { guest, guestContext } = await inviteSecondUser(owner, browser, uniqueEmail('reorder-guest'));
+    await expect(listColumn(guest, 'Grid').locator('.card').first()).toContainText('First');
+
+    await dragCardTo(owner, 'Second', 'Grid');
+    await expect(listColumn(owner, 'Grid').locator('.card').first()).toContainText('Second');
+    await expect(listColumn(guest, 'Grid').locator('.card').first()).toContainText('Second', { timeout: 10_000 });
+
+    await guestContext.close();
+  });
+
+  test("a user's other tab picks up their own changes", async ({ page: tab1, context }) => {
+    await register(tab1, uniqueEmail('two-tabs'));
+    await createBoard(tab1, 'Spa');
+    await addList(tab1, 'Sector 1');
+    const tab2 = await context.newPage();
+    await tab2.goto(tab1.url());
+    await expect(tab2.getByRole('heading', { name: 'Sector 1' })).toBeVisible();
+
+    await addCard(tab1, 'Sector 1', 'Eau Rouge');
+    await expect(listColumn(tab2, 'Sector 1').getByText('Eau Rouge')).toBeVisible({ timeout: 10_000 });
   });
 });

@@ -9,8 +9,8 @@
       <input
         type="search"
         class="search-input"
-        placeholder="Search"
-        aria-label="Search boards and cards"
+        placeholder="Buscar"
+        aria-label="Buscar tableros y tarjetas"
         autocomplete="off"
         [value]="term()"
         (focus)="openSearch()"
@@ -20,18 +20,18 @@
       @if (searchOpen()) {
         <div class="dropdown" (mousedown)="$event.preventDefault()">
           @if (!searching) {
-            <p class="drop-title">Recent boards</p>
+            <p class="drop-title">Tableros recientes</p>
             @for (b of recent(); track b.id) {
               <button type="button" class="row" (click)="openBoard(b.id)">
                 <span class="row-title">{{ b.title }}</span>
               </button>
             } @empty {
-              <p class="empty-note">No boards yet.</p>
+              <p class="empty-note">Aún no hay tableros.</p>
             }
           } @else if (answeredFor() !== term().trim()) {
-            <p class="empty-note">Searching…</p>
+            <p class="empty-note">Buscando…</p>
           } @else if (hits().length) {
-            <p class="drop-title">Cards</p>
+            <p class="drop-title">Tarjetas</p>
             @for (h of hits(); track h.cardId) {
               <button type="button" class="row" (click)="openBoard(h.boardId, h.cardId)">
                 <span class="row-title">{{ h.title }}</span>
@@ -41,24 +41,24 @@
           } @else {
             <div class="empty-state">
               <span class="empty-icon" aria-hidden="true">?</span>
-              <p class="empty-head">Nothing matches your search.</p>
-              <p class="empty-note">Try again with a different term.</p>
+              <p class="empty-head">No hay resultados para tu búsqueda.</p>
+              <p class="empty-note">Prueba con otro término.</p>
             </div>
           }
         </div>
       }
     </div>
-    <button type="button" class="create" (click)="openCreate()">Create board</button>
+    <button type="button" class="create" (click)="openCreate()">Crear tablero</button>
   </div>
 
   <div class="right">
-    <app-theme-toggle />
     @if (auth.currentUser(); as user) {
+      <app-notification-bell />
       <div class="account" (focusout)="menuOpen.set(false)">
         <button
           type="button"
           class="avatar"
-          aria-label="Account"
+          aria-label="Cuenta"
           [style]="avatarStyle(user.sub)"
           (click)="menuOpen.set(!menuOpen())"
         >
@@ -66,11 +66,14 @@
         </button>
         @if (menuOpen()) {
           <div class="dropdown account-menu" (mousedown)="$event.preventDefault()">
-            <p class="drop-title">Account</p>
+            <p class="drop-title">Cuenta</p>
             <p class="acc-name">{{ user.displayName || user.email }}</p>
             <p class="acc-email">{{ user.email }}</p>
-            <button type="button" class="row" (click)="openProfile()"><span class="row-title">Profile</span></button>
-            <button type="button" class="row" (click)="logout()"><span class="row-title">Log out</span></button>
+            <button type="button" class="row" (click)="openProfile()"><span class="row-title">Perfil</span></button>
+            @if (user.role === 'ADMIN') {
+              <button type="button" class="row" (click)="openAdmin()"><span class="row-title">Gestionar usuarios</span></button>
+            }
+            <button type="button" class="row" (click)="logout()"><span class="row-title">Cerrar sesión</span></button>
           </div>
         }
       </div>
@@ -80,44 +83,55 @@
 
 <dialog #createDialog class="profile-dialog">
   <form (submit)="$event.preventDefault(); createBoard(titleField.value, wsField.value)">
-    <p class="label-caps">Create board</p>
-    <label class="label-caps" for="board-title">Board title</label>
+    <p class="label-caps">Crear tablero</p>
+    <label class="label-caps" for="board-title">Título del tablero</label>
     <input #titleField id="board-title" type="text" maxlength="100" autofocus autocomplete="off" />
-    <label class="label-caps" for="board-workspace">Workspace</label>
-    <!-- No workspaces yet: "" (the API files it in a new default one), plus the create option. -->
+    <label class="label-caps" for="board-workspace">Espacio de trabajo</label>
+    <!-- No workspaces yet: "" (the API files it in a new default one), plus the create option.
+         `selected` on the first real option: these render after the static create option, which
+         the browser would otherwise have auto-selected as the only option present. -->
     <select #wsField id="board-workspace" (change)="newWorkspace.set(wsField.value === NEW_WS)">
-      @for (w of ownWorkspaces(); track w.id) {
-        <option [value]="w.id">{{ w.name }}</option>
+      @for (w of ownWorkspaces(); track w.id; let first = $first) {
+        <option [value]="w.id" [selected]="first">{{ w.name }}</option>
       } @empty {
-        <option value="">My workspace</option>
+        <option value="" selected>Mi espacio de trabajo</option>
       }
-      <option [value]="NEW_WS">+ Create workspace&hellip;</option>
+      <option [value]="NEW_WS">+ Crear espacio de trabajo&hellip;</option>
     </select>
     @if (newWorkspace()) {
-      <label class="label-caps" for="new-workspace">New workspace name</label>
-      <input #newWsField id="new-workspace" type="text" maxlength="60" placeholder="e.g. Software" autocomplete="off" autofocus />
+      <label class="label-caps" for="new-workspace">Nombre del nuevo espacio de trabajo</label>
+      <input #newWsField id="new-workspace" type="text" maxlength="60" placeholder="p. ej. Software" autocomplete="off" autofocus />
     }
     <div class="dialog-actions">
-      <button type="submit" class="btn btn-primary">Create</button>
-      <button type="button" class="btn btn-outline" (click)="createDialog.close()">Cancel</button>
+      <button type="submit" class="btn btn-primary">Crear</button>
+      <button type="button" class="btn btn-outline" (click)="createDialog.close()">Cancelar</button>
     </div>
   </form>
 </dialog>
 
 <dialog #profileDialog class="profile-dialog">
-  <p class="label-caps">Profile</p>
+  <p class="label-caps">Perfil</p>
   <p class="acc-email">{{ auth.currentUser()?.email }}</p>
-  <label class="label-caps" for="display-name">Display name</label>
+  <label class="label-caps" for="display-name">Nombre visible</label>
   <input
     #nameField
     id="display-name"
     type="text"
     maxlength="60"
-    placeholder="Shown instead of your email"
+    placeholder="Se muestra en lugar de tu correo"
     [value]="auth.currentUser()?.displayName ?? ''"
   />
   <div class="dialog-actions">
-    <button type="button" class="btn btn-primary" (click)="saveProfile(nameField.value)">Save</button>
-    <button type="button" class="btn btn-outline" (click)="profileDialog.close()">Cancel</button>
+    <button type="button" class="btn btn-primary" (click)="saveProfile(nameField.value)">Guardar</button>
+    <button type="button" class="btn btn-outline" (click)="profileDialog.close()">Cancelar</button>
+  </div>
+
+  <div class="pw-section">
+    <p class="label-caps">Contraseña</p>
+    @if (auth.currentUser()?.hasPassword) {
+      <a routerLink="/account/password" class="btn btn-outline pw-link" (click)="profileDialog.close()">Cambiar contraseña</a>
+    } @else {
+      <p class="acc-email">Inicias sesión con Microsoft, así que aquí no hay contraseña que cambiar.</p>
+    }
   </div>
 </dialog>

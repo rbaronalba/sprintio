@@ -7,8 +7,8 @@
     class="star-btn"
     [class.on]="b.starred"
     [attr.aria-pressed]="b.starred"
-    [attr.aria-label]="b.starred ? 'Unstar board' : 'Star board'"
-    [title]="b.starred ? 'Unstar board' : 'Star board'"
+    [attr.aria-label]="b.starred ? 'Quitar de destacados' : 'Destacar tablero'"
+    [title]="b.starred ? 'Quitar de destacados' : 'Destacar tablero'"
     (click)="toggleStar(b)"
   >
     <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" [attr.fill-opacity]="b.starred ? 1 : 0" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" d="M8 1.6l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.4l-3.8 2 .7-4.3-3.1-3 4.3-.6z" /></svg>
@@ -16,13 +16,13 @@
 </ng-template>
 
 <div class="layout">
-  <nav class="sidebar" aria-label="Main">
+  <nav class="sidebar" aria-label="Principal">
     <a
       routerLink="/boards"
       routerLinkActive="active"
       class="nav-item"
     >
-      <span class="nav-icon" aria-hidden="true">&#9638;</span> Boards
+      <span class="nav-icon" aria-hidden="true">&#9638;</span> Tableros
     </a>
     <a
       routerLink="/home"
@@ -30,12 +30,12 @@
       [routerLinkActiveOptions]="{ exact: true }"
       class="nav-item"
     >
-      <span class="nav-icon" aria-hidden="true">&#8962;</span> Home
+      <span class="nav-icon" aria-hidden="true">&#8962;</span> Inicio
     </a>
 
     <div class="nav-heading">
-      <span>Workspaces</span>
-      <button type="button" class="icon-btn" aria-label="Create workspace" title="Create workspace" (click)="openCreateWorkspace()">
+      <span>Espacios de trabajo</span>
+      <button type="button" class="icon-btn" aria-label="Crear espacio de trabajo" title="Crear espacio de trabajo" (click)="openCreateWorkspace()">
         +
       </button>
     </div>
@@ -45,7 +45,7 @@
         <span class="ws-name">{{ w.name }}</span>
       </a>
     } @empty {
-      <p class="nav-note">No workspaces yet.</p>
+      <p class="nav-note">Aún no hay espacios de trabajo.</p>
     }
   </nav>
 
@@ -54,11 +54,11 @@
       <div class="home">
         <section class="home-main">
           @if (auth.currentUser(); as user) {
-            <p class="greeting">Welcome back, <strong data-testid="current-user">{{ user.displayName || user.email }}</strong></p>
+            <p class="greeting">Hola de nuevo, <strong data-testid="current-user">{{ user.displayName || user.email }}</strong></p>
           }
           @if (starred().length) {
-            <section class="starred" aria-label="Starred boards">
-              <h2 class="group-title"><span class="star" aria-hidden="true">&#9733;</span> Starred boards</h2>
+            <section class="starred" aria-label="Tableros destacados">
+              <h2 class="group-title"><span class="star" aria-hidden="true">&#9733;</span> Tableros destacados</h2>
               <ul class="board-grid">
                 @for (b of starred(); track b.id) {
               <li class="board-tile"><ng-container *ngTemplateOutlet="tile; context: { $implicit: b }" /></li>
@@ -74,14 +74,14 @@
                 <span class="art-list"><i></i></span>
               </div>
             </div>
-            <h2>Organize anything</h2>
-            <p>Put everything in one place and start moving things forward with your first Sprintio board!</p>
-            <button type="button" class="btn btn-primary" (click)="openCreateBoard()">Create a Workspace board</button>
+            <h2>Organiza lo que quieras</h2>
+            <p>Ponlo todo en un solo sitio y empieza a avanzar con tu primer tablero de Sprintio.</p>
+            <button type="button" class="btn btn-primary" (click)="openCreateBoard()">Crear un tablero</button>
           </div>
         </section>
 
         <aside class="home-side">
-          <p class="side-heading"><span aria-hidden="true">&#9719;</span> Recently viewed</p>
+          <p class="side-heading"><span aria-hidden="true">&#9719;</span> Vistos recientemente</p>
           @for (b of recent(); track b.id) {
             <a class="side-row" [routerLink]="['/boards', b.id]">
               <span class="thumb" [style]="avatarStyle(b.id)" aria-hidden="true"></span>
@@ -91,20 +91,20 @@
               </span>
             </a>
           } @empty {
-            <p class="nav-note">Boards you open show up here.</p>
+            <p class="nav-note">Los tableros que abras aparecerán aquí.</p>
           }
 
-          <p class="side-heading">Links</p>
+          <p class="side-heading">Enlaces</p>
           <button type="button" class="side-row side-create" (click)="openCreateBoard()">
             <span class="thumb thumb-plus" aria-hidden="true">+</span>
-            <span class="side-title">Create a new board</span>
+            <span class="side-title">Crear un tablero nuevo</span>
           </button>
         </aside>
       </div>
     } @else {
       @if (!workspaceId() && recent().length) {
-        <section class="group" aria-label="Recently viewed">
-          <h2 class="group-title"><span aria-hidden="true">&#9719;</span> Recently viewed</h2>
+        <section class="group" aria-label="Vistos recientemente">
+          <h2 class="group-title"><span aria-hidden="true">&#9719;</span> Vistos recientemente</h2>
           <ul class="board-grid">
             @for (b of recent(); track b.id) {
               <li class="board-tile"><ng-container *ngTemplateOutlet="tile; context: { $implicit: b }" /></li>
@@ -114,7 +114,7 @@
       }
 
       @if (!workspaceId()) {
-        <h2 class="label-caps all-title">Your workspaces</h2>
+        <h2 class="label-caps all-title">Tus espacios de trabajo</h2>
       }
       @for (s of sections(); track s.workspace.id) {
         <section class="group" [attr.aria-label]="s.workspace.name">
@@ -126,7 +126,7 @@
                 type="text"
                 class="ws-rename"
                 maxlength="60"
-                aria-label="Workspace name"
+                aria-label="Nombre del espacio de trabajo"
                 autofocus
                 [value]="s.workspace.name"
                 (keydown.enter)="renameWorkspace(s.workspace, wsRename.value)"
@@ -139,11 +139,11 @@
             @if (renamingWs() !== s.workspace.id) {
               <span class="ws-actions">
                 @if (s.workspace.isMember) {
-                  <button type="button" class="text-btn" (click)="openMembers(s.workspace)">Members</button>
+                  <button type="button" class="text-btn" (click)="openMembers(s.workspace)">Miembros</button>
                 }
                 @if (isOwner(s.workspace)) {
-                  <button type="button" class="text-btn" (click)="renamingWs.set(s.workspace.id)">Rename</button>
-                  <button type="button" class="text-btn text-btn--danger" (click)="askDeleteWorkspace(s.workspace)">Delete</button>
+                  <button type="button" class="text-btn" (click)="renamingWs.set(s.workspace.id)">Renombrar</button>
+                  <button type="button" class="text-btn text-btn--danger" (click)="askDeleteWorkspace(s.workspace)">Eliminar</button>
                 }
               </span>
             }
@@ -153,7 +153,7 @@
               <li class="board-tile">
                 <ng-container *ngTemplateOutlet="tile; context: { $implicit: board }" />
                 @if (board.ownerId === auth.currentUser()?.sub) {
-                  <button type="button" class="icon-btn" (click)="askDelete(board)" aria-label="Remove board">
+                  <button type="button" class="icon-btn" (click)="askDelete(board)" aria-label="Eliminar tablero">
                     &times;
                   </button>
                 }
@@ -166,23 +166,23 @@
                     <input
                       type="text"
                       formControlName="title"
-                      placeholder="Board title"
-                      aria-label="Board title"
+                      placeholder="Título del tablero"
+                      aria-label="Título del tablero"
                       autofocus
                       (keydown.escape)="creatingIn.set(null)"
                     />
                     <div class="new-actions">
                       <button type="submit" class="btn btn-primary" [disabled]="form.invalid || pending()">
-                        Create
+                        Crear
                       </button>
-                      <button type="button" class="icon-btn" aria-label="Cancel" (click)="creatingIn.set(null)">
+                      <button type="button" class="icon-btn" aria-label="Cancelar" (click)="creatingIn.set(null)">
                         &times;
                       </button>
                     </div>
                   </form>
                 } @else {
                   <button type="button" class="new-trigger" (click)="startCreate(s.workspace.id)">
-                    + Create new board
+                    + Nuevo tablero
                   </button>
                 }
               </li>
@@ -191,8 +191,8 @@
         </section>
       } @empty {
         <div class="empty">
-          <p>You don't have any workspaces yet. A workspace groups boards, for example one per department.</p>
-          <button type="button" class="btn btn-primary" (click)="openCreateWorkspace()">Create a workspace</button>
+          <p>Aún no tienes espacios de trabajo. Un espacio de trabajo agrupa tableros, por ejemplo uno por departamento.</p>
+          <button type="button" class="btn btn-primary" (click)="openCreateWorkspace()">Crear un espacio de trabajo</button>
         </div>
       }
     }
@@ -201,34 +201,34 @@
 
 <dialog #workspaceDialog class="confirm-dialog">
   <form (submit)="$event.preventDefault(); createWorkspace(wsName)">
-    <p class="label-caps">Create workspace</p>
-    <label class="label-caps" for="workspace-name">Workspace name</label>
-    <input #wsName id="workspace-name" type="text" maxlength="60" placeholder="e.g. Software" autocomplete="off" />
+    <p class="label-caps">Crear espacio de trabajo</p>
+    <label class="label-caps" for="workspace-name">Nombre del espacio de trabajo</label>
+    <input #wsName id="workspace-name" type="text" maxlength="60" placeholder="p. ej. Software" autocomplete="off" />
     <div class="dialog-actions">
-      <button type="submit" class="btn btn-primary">Create</button>
-      <button type="button" class="btn btn-outline" (click)="workspaceDialog.close()">Cancel</button>
+      <button type="submit" class="btn btn-primary">Crear</button>
+      <button type="button" class="btn btn-outline" (click)="workspaceDialog.close()">Cancelar</button>
     </div>
   </form>
 </dialog>
 
 <dialog #membersDialog class="confirm-dialog members-dialog">
   @if (membersOf(); as w) {
-    <p class="label-caps">{{ w.name }} members</p>
+    <p class="label-caps">Miembros de {{ w.name }}</p>
     @if (isOwner(w)) {
       @if (shareLink(); as link) {
         <p class="dialog-note">
-          Anyone signed in who opens this link joins the workspace and every board in it. Stopping
-          sharing kills the link; people who already joined keep access.
+          Cualquier persona con sesión iniciada que abra este enlace se une al espacio de trabajo y a
+          todos sus tableros. Dejar de compartir anula el enlace; quienes ya se unieron conservan el acceso.
         </p>
-        <input #linkInput type="text" readonly [value]="link" aria-label="Workspace invitation link" />
+        <input #linkInput type="text" readonly [value]="link" aria-label="Enlace de invitación al espacio de trabajo" />
         <div class="dialog-actions">
-          <button type="button" class="btn btn-primary" (click)="copyLink(linkInput)">Copy link</button>
-          <button type="button" class="btn btn-outline" (click)="stopSharing()">Stop sharing</button>
+          <button type="button" class="btn btn-primary" (click)="copyLink(linkInput)">Copiar enlace</button>
+          <button type="button" class="btn btn-outline" (click)="stopSharing()">Dejar de compartir</button>
         </div>
       } @else {
-        <p class="dialog-note">Invite people to every board in this workspace with a link.</p>
+        <p class="dialog-note">Invita a gente a todos los tableros de este espacio de trabajo con un enlace.</p>
         <div class="dialog-actions">
-          <button type="button" class="btn btn-primary" (click)="createInvite()">Create invite link</button>
+          <button type="button" class="btn btn-primary" (click)="createInvite()">Crear enlace de invitación</button>
         </div>
       }
     }
@@ -238,17 +238,17 @@
           <span class="member-avatar" [style]="avatarStyle(m.userId)" aria-hidden="true">{{ initials(m.displayName, m.email) }}</span>
           <span class="member-name" [title]="m.email">{{ m.displayName || m.email }}</span>
           @if (m.userId === w.ownerId) {
-            <span class="member-role">Owner</span>
+            <span class="member-role">Administrador</span>
           } @else if (m.userId === auth.currentUser()?.sub) {
-            <button type="button" class="text-btn text-btn--danger" (click)="askRemoveMember(m)">Leave</button>
+            <button type="button" class="text-btn text-btn--danger" (click)="askRemoveMember(m)">Salir</button>
           } @else if (isOwner(w)) {
-            <button type="button" class="text-btn text-btn--danger" (click)="askRemoveMember(m)">Remove</button>
+            <button type="button" class="text-btn text-btn--danger" (click)="askRemoveMember(m)">Quitar</button>
           }
         </li>
       }
     </ul>
     <div class="dialog-actions">
-      <button type="button" class="btn btn-outline" (click)="membersDialog.close()">Close</button>
+      <button type="button" class="btn btn-outline" (click)="membersDialog.close()">Cerrar</button>
     </div>
   }
 </dialog>
@@ -256,13 +256,13 @@
 <dialog #confirmDialog class="confirm-dialog">
   <p>
     @if (pendingDelete()?.phrase) {
-      Are you sure you want to {{ pendingDelete()?.title }}? {{ pendingDelete()?.warning }}
+      ¿Seguro que quieres {{ pendingDelete()?.title }}? {{ pendingDelete()?.warning }}
     } @else {
-      Are you sure you want to delete <strong>{{ pendingDelete()?.title }}</strong>? {{ pendingDelete()?.warning }}
+      ¿Seguro que quieres eliminar <strong>{{ pendingDelete()?.title }}</strong>? {{ pendingDelete()?.warning }}
     }
   </p>
   <div class="dialog-actions">
-    <button type="button" class="btn btn-primary" (click)="confirmDelete()">{{ pendingDelete()?.phrase ? 'Confirm' : 'Delete' }}</button>
-    <button type="button" class="btn btn-outline" (click)="confirmDialog.close()">Cancel</button>
+    <button type="button" class="btn btn-primary" (click)="confirmDelete()">{{ pendingDelete()?.phrase ? 'Confirmar' : 'Eliminar' }}</button>
+    <button type="button" class="btn btn-outline" (click)="confirmDialog.close()">Cancelar</button>
   </div>
 </dialog>

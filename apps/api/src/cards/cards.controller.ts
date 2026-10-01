@@ -8,6 +8,7 @@ import {
   Patch,
   Post,
   Put,
+  Query,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -19,9 +20,10 @@ import {
   parseChecklistUpdate,
   parseCommentBody,
   parseTimeEntry,
+  parseTimeEntryUpdate,
   parseUpsertCard,
 } from './dto.js';
-import { attachmentUploadOptions, removeUpload } from './uploads.js';
+import { fileUploadOptions, removeUpload } from './uploads.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
 import type { JwtPayload } from '../auth/auth.service.js';
@@ -43,6 +45,11 @@ export class ListCardsController {
 @Controller('cards')
 export class CardsController {
   constructor(private readonly cards: CardsService) {}
+
+  @Get(':id')
+  getOne(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.cards.getOne(user.sub, id);
+  }
 
   @Patch(':id')
   update(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() body: unknown) {
@@ -79,14 +86,15 @@ export class CardsController {
     return this.cards.listActivity(user.sub, id);
   }
 
+  /** The newest page; `?before=<commentId>` for the page older than that comment. */
   @Get(':id/comments')
-  listComments(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
-    return this.cards.listComments(user.sub, id);
+  listComments(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Query('before') before?: string) {
+    return this.cards.listComments(user.sub, id, typeof before === 'string' && before ? before : undefined);
   }
 
   /** JSON `{ body }`, or multipart `body` + an image `file` shown inside the comment. */
   @Post(':id/comments')
-  @UseInterceptors(FileInterceptor('file', attachmentUploadOptions))
+  @UseInterceptors(FileInterceptor('file', fileUploadOptions))
   async addComment(
     @CurrentUser() user: JwtPayload,
     @Param('id') id: string,
@@ -121,6 +129,16 @@ export class CardsController {
     return this.cards.addTimeEntry(user.sub, id, parseTimeEntry(body));
   }
 
+  @Patch(':id/time/:entryId')
+  updateTimeEntry(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Param('entryId') entryId: string,
+    @Body() body: unknown,
+  ) {
+    return this.cards.updateTimeEntry(user.sub, id, entryId, parseTimeEntryUpdate(body));
+  }
+
   @Delete(':id/time/:entryId')
   removeTimeEntry(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Param('entryId') entryId: string) {
     return this.cards.removeTimeEntry(user.sub, id, entryId);
@@ -132,14 +150,20 @@ export class CardsController {
   }
 
   @Post(':id/attachments')
-  @UseInterceptors(FileInterceptor('file', attachmentUploadOptions))
-  addAttachment(
+  @UseInterceptors(FileInterceptor('file', fileUploadOptions))
+  async addAttachment(
     @CurrentUser() user: JwtPayload,
     @Param('id') id: string,
     @UploadedFile() file: Express.Multer.File,
   ) {
     if (!file) throw new BadRequestException('File is required');
-    return this.cards.addAttachment(user.sub, id, file);
+    try {
+      return await this.cards.addAttachment(user.sub, id, file);
+    } catch (e) {
+      // The file hit the disk before the checks ran: a rejected upload must not stay there.
+      await removeUpload(`/uploads/${file.filename}`);
+      throw e;
+    }
   }
 
   @Delete(':id/attachments/:attachmentId')

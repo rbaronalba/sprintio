@@ -88,6 +88,16 @@ export class BoardsController {
     return this.boards.removeMember(user.sub, id, userId);
   }
 
+  @Put(':id/owner/:userId')
+  transfer(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Param('userId') userId: string) {
+    return this.boards.transfer(user.sub, id, userId);
+  }
+
+  @Get(':id/archived')
+  listArchived(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.boards.listArchived(user.sub, id);
+  }
+
   @Get(':id/activity')
   listActivity(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.boards.listActivity(user.sub, id);

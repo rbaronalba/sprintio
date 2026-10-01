@@ -69,6 +69,12 @@ export interface SearchHit {
   boardTitle: string;
 }
 
+export interface ArchivedCard {
+  id: string;
+  title: string;
+  list: { title: string };
+}
+
 export interface ActivityEntry {
   id: string;
   type: string;
@@ -174,6 +180,15 @@ export class BoardsService {
   /** Owner removing someone, or anyone passing their own id to leave. */
   removeMember(boardId: string, userId: string): Observable<unknown> {
     return this.http.delete(`/boards/${boardId}/members/${userId}`);
+  }
+
+  /** Owner only; the target must already be a member. */
+  transferOwnership(boardId: string, userId: string): Observable<unknown> {
+    return this.http.put(`/boards/${boardId}/owner/${userId}`, {});
+  }
+
+  listArchived(boardId: string): Observable<ArchivedCard[]> {
+    return this.http.get<ArchivedCard[]>(`/boards/${boardId}/archived`);
   }
 
   search(term: string): Observable<SearchHit[]> {

@@ -9,6 +9,8 @@ export interface AuthUser {
   email: string;
   role: Role;
   displayName: string | null;
+  /** False for accounts that only sign in with Microsoft: nothing to change in the profile. */
+  hasPassword: boolean;
 }
 
 interface AuthResponse {
@@ -85,6 +87,16 @@ export class AuthService {
     return this.http
       .patch<AuthUser>('/auth/profile', { displayName })
       .pipe(tap((user) => this.currentUserSignal.set(user)));
+  }
+
+  /** Which sign-in buttons to show (Microsoft only when the server is configured for it). */
+  providers(): Observable<{ microsoft: boolean }> {
+    return this.http.get<{ microsoft: boolean }>('/auth/providers');
+  }
+
+  /** Signs out every other device; this one stays signed in. */
+  changePassword(currentPassword: string, newPassword: string): Observable<unknown> {
+    return this.http.post('/auth/password', { currentPassword, newPassword }, { withCredentials: true });
   }
 
   clearSession(): void {

@@ -31,7 +31,24 @@ describe('LoginComponent', () => {
 
   afterEach(() => httpMock.verify());
 
+  /** The page asks which sign-in providers exist as soon as it is created. */
+  const answerProviders = (microsoft = false) => httpMock.expectOne('/auth/providers').flush({ microsoft });
+
+  it('offers Microsoft sign-in only when the server has it configured', () => {
+    answerProviders(true);
+    fixture.detectChanges();
+    const link: HTMLAnchorElement | null = fixture.nativeElement.querySelector('a[href="/auth/microsoft"]');
+    expect(link?.textContent).toContain('Iniciar sesión con Microsoft');
+  });
+
+  it('hides Microsoft sign-in when it is not configured', () => {
+    answerProviders(false);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('a[href="/auth/microsoft"]')).toBeNull();
+  });
+
   it('navigates to the dashboard after a successful login', async () => {
+    answerProviders();
     fixture.componentInstance.submit();
     httpMock.expectOne('/auth/login').flush({
       accessToken: 'token-1',
@@ -43,11 +60,12 @@ describe('LoginComponent', () => {
   });
 
   it('shows an error when the credentials are rejected', async () => {
+    answerProviders();
     fixture.componentInstance.submit();
     httpMock.expectOne('/auth/login').flush(null, { status: 401, statusText: 'Unauthorized' });
 
     fixture.detectChanges();
     const alert: HTMLElement = fixture.nativeElement.querySelector('[role="alert"]');
-    expect(alert.textContent).toContain('Invalid email or password');
+    expect(alert.textContent).toContain('Correo o contraseña incorrectos');
   });
 });

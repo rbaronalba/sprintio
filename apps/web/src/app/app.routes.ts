@@ -52,6 +52,17 @@ export const routes: Routes = [
       import('./boards/board-detail.component').then((m) => m.BoardDetailComponent),
   },
   {
+    path: 'account/password',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./account/change-password.component').then((m) => m.ChangePasswordComponent),
+  },
+  {
+    path: 'admin',
+    canActivate: [authGuard],
+    loadComponent: () => import('./admin/admin.component').then((m) => m.AdminComponent),
+  },
+  {
     path: '**',
     loadComponent: () => import('./not-found/not-found.component').then((m) => m.NotFoundComponent),
   },

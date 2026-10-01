@@ -45,3 +45,15 @@ export function parseDisplayName(body: unknown): string | null {
   // Empty means "no display name", same as null — one representation in the DB.
   return trimmed || null;
 }
+
+export function parsePasswordChange(body: unknown): { current: string; next: string } {
+  const { currentPassword, newPassword } = (body ?? {}) as Record<string, unknown>;
+  if (typeof currentPassword !== 'string' || currentPassword.length > 128) {
+    throw new BadRequestException('La contraseña actual es obligatoria');
+  }
+  // Same rule as registration.
+  if (typeof newPassword !== 'string' || newPassword.length < 8 || newPassword.length > 128) {
+    throw new BadRequestException('La nueva contraseña debe tener entre 8 y 128 caracteres');
+  }
+  return { current: currentPassword, next: newPassword };
+}

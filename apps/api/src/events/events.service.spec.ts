@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { firstValueFrom, take, toArray } from 'rxjs';
 import { EventsService } from './events.service.js';
 import { extractMentions } from '../cards/dto.js';
+import { mailSubject } from './mail.js';
 
 /** Minimal prisma stub: enough for record() and the membership lookup, nothing more. */
 function stubPrisma(boardIds: string[], created: unknown[] = []) {
@@ -122,6 +123,17 @@ describe('EventsService', () => {
     await expect(
       service.record({ type: 'CARD_MOVED', boardId: 'b1', actorId: 'u1' }),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe('mailSubject', () => {
+  it('emails only assignment, removal and moves between lists', () => {
+    expect(mailSubject('CARD_ASSIGNED', 'Ana', { title: 'Fix login' })).toBe('Ana te ha asignado a "Fix login"');
+    expect(mailSubject('CARD_UNASSIGNED', 'Ana', { title: 'Fix login' })).toBe('Ana te ha quitado de "Fix login"');
+    expect(mailSubject('CARD_MOVED', 'Ana', { title: 'Fix login', from: 'Doing', to: 'QA' })).toBe(
+      'Ana ha movido "Fix login" de Doing a QA',
+    );
+    expect(mailSubject('COMMENT_ADDED', 'Ana', { title: 'Fix login' })).toBeNull();
   });
 });
 

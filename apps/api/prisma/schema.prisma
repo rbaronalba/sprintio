@@ -22,8 +22,13 @@ model User {
   id               String            @id @default(cuid())
   email            String            @unique
   displayName      String?
-  passwordHash     String
+  /// Null for accounts that only ever signed in with Microsoft.
+  passwordHash     String?
+  /// Entra ID object id (`oid`), set on first Microsoft sign-in. Stable even if the email changes.
+  microsoftId      String?           @unique
   role             Role              @default(DEVELOPER)
+  /// Set by an admin (someone left the company): no sign-in, no refresh. Null = active.
+  disabledAt       DateTime?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   boards           Board[]
@@ -115,7 +120,7 @@ model List {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  @@index([boardId])
+  @@index([boardId, position])
 }
 
 model Card {
@@ -139,7 +144,10 @@ model Card {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
-  @@index([listId])
+  @@index([listId, position])
+  /// Trigram indexes: what lets search's case-insensitive "contains" use an index at all.
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([description(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 model ChecklistItem {
@@ -184,7 +192,8 @@ model Comment {
   attachments Attachment[]
   createdAt   DateTime     @default(now())
 
-  @@index([cardId])
+  @@index([cardId, createdAt])
+  @@index([authorId])
 }
 
 model TimeEntry {
@@ -198,7 +207,9 @@ model TimeEntry {
   userId    String
   createdAt DateTime @default(now())
 
-  @@index([cardId])
+  /// One row per person per day: logging more time that day adds to it.
+  @@unique([cardId, userId, date])
+  @@index([userId])
 }
 
 model Attachment {
@@ -217,6 +228,7 @@ model Attachment {
 
   @@index([cardId])
   @@index([commentId])
+  @@index([uploaderId])
 }
 
 model BoardMember {
@@ -264,6 +276,7 @@ model Event {
 
   @@index([boardId, createdAt])
   @@index([cardId, createdAt])
+  @@index([actorId])
 }
 
 model Notification {
@@ -278,4 +291,6 @@ model Notification {
   // Makes fan-out idempotent: a retried record() can't double-notify.
   @@unique([userId, eventId])
   @@index([userId, readAt])
+  @@index([userId, createdAt])
+  @@index([eventId])
 }

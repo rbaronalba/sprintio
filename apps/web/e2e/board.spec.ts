@@ -22,24 +22,24 @@ test.describe('board basics', () => {
     await listColumn(page, 'Todo').getByText('Check brake ducts').click();
     const modal = page.locator('dialog[open]');
 
-    await modal.getByRole('button', { name: 'Add members' }).click();
+    await modal.getByRole('button', { name: 'Añadir miembros' }).click();
     await modal.getByRole('button', { name: /Test Driver/ }).click();
     await expect(modal.locator('.meta-chips .avatar')).toHaveText('TD');
 
-    await modal.getByRole('button', { name: 'Add labels' }).click();
-    await modal.getByRole('button', { name: 'Create a new label' }).click();
-    await modal.getByLabel('Title').fill('Aero');
-    await modal.getByRole('button', { name: 'Create', exact: true }).click();
+    await modal.getByRole('button', { name: 'Añadir etiquetas' }).click();
+    await modal.getByRole('button', { name: 'Crear una etiqueta nueva' }).click();
+    await modal.getByLabel('Título').fill('Aero');
+    await modal.getByRole('button', { name: 'Crear', exact: true }).click();
     await expect(modal.locator('.meta-chips .label-chip')).toHaveText('Aero');
 
     // The modal's running total must follow a new entry without reopening the card.
-    await modal.getByRole('button', { name: 'Add time' }).click();
+    await modal.getByRole('button', { name: 'Añadir tiempo' }).click();
     const timePop = modal.locator('.time-pop');
-    await timePop.getByLabel('Time', { exact: true }).fill('2.5');
-    await timePop.getByRole('button', { name: 'Add', exact: true }).click();
-    await expect(modal.locator('.time-summary')).toHaveText('Time: 2.5h');
+    await timePop.getByLabel('Tiempo', { exact: true }).fill('2.5');
+    await timePop.getByRole('button', { name: 'Añadir', exact: true }).click();
+    await expect(modal.locator('.time-summary')).toHaveText('Tiempo: 2.5h');
 
-    // Attach sits in the comments column: one click opens the file picker.
+    // Images are attached to a comment: pick one, then post the comment.
     await modal.locator('.card-dialog-side input[type=file]').setInputFiles({
       name: 'pit.png',
       mimeType: 'image/png',
@@ -48,7 +48,38 @@ test.describe('board basics', () => {
         'base64',
       ),
     });
-    await expect(modal.locator('.card-dialog-side .attachment img')).toHaveAttribute('alt', 'pit.png');
+    await modal.getByRole('button', { name: 'Comentar', exact: true }).click();
+    await expect(modal.locator('.comment-img img')).toHaveAttribute('alt', 'pit.png');
+  });
+
+  test('sets a due date, attaches a log file, and restores an archived card', async ({ page }) => {
+    await register(page, uniqueEmail('launch'));
+    await createBoard(page, 'Suzuka');
+    await addList(page, 'Todo');
+    await addCard(page, 'Todo', 'Check telemetry');
+
+    await listColumn(page, 'Todo').getByText('Check telemetry').click();
+    const modal = page.locator('dialog[open]');
+    await modal.getByLabel('Vencimiento').fill('2030-01-15');
+    await expect(listColumn(page, 'Todo').locator('.due')).toContainText('15');
+
+    // Not an image: shown as a download link, not inline.
+    await modal.locator('.card-dialog-side input[type=file]').setInputFiles({
+      name: 'server.log',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('boom'),
+    });
+    await modal.getByRole('button', { name: 'Comentar', exact: true }).click();
+    await expect(modal.getByRole('link', { name: /server\.log/ })).toHaveAttribute('download', 'server.log');
+
+    await modal.locator('summary[aria-label="Acciones de la tarjeta"]').click();
+    await modal.getByRole('button', { name: 'Archivar' }).click();
+    await expect(listColumn(page, 'Todo').getByText('Check telemetry')).toHaveCount(0);
+
+    await page.locator('.board-title').click();
+    await page.getByRole('button', { name: 'Tarjetas archivadas' }).click();
+    await page.getByRole('button', { name: 'Restaurar' }).click();
+    await expect(listColumn(page, 'Todo').getByText('Check telemetry')).toBeVisible();
   });
 
   test('moves a card to another list and keeps it there after a reload', async ({ page }) => {
@@ -76,8 +107,8 @@ test.describe('board basics', () => {
     await createBoard(page, 'Imola');
 
     // Log out lives in the account menu of the top bar.
-    await page.getByRole('button', { name: 'Account' }).click();
-    await page.getByRole('button', { name: 'Log out' }).click();
+    await page.getByRole('button', { name: 'Cuenta' }).click();
+    await page.getByRole('button', { name: 'Cerrar sesión' }).click();
     await expect(page).toHaveURL(/\/login/);
 
     await login(page, email);
