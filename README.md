@@ -19,11 +19,11 @@ A self-hosted Trello-style project management tool: workspaces, boards, lists an
 - Auth: email/password or Microsoft sign-in (Azure AD), user admin panel
 - Email notifications (SMTP)
 
-## Capturas
+## Screenshots
 
-| Tablero | Detalle de tarjeta |
+| Board | Card detail |
 |---|---|
-| ![Tablero con listas y tarjetas](docs/screenshots/board.jpg) | ![Detalle de una tarjeta con checklist](docs/screenshots/card-detail.jpg) |
+| ![Board with lists and cards](docs/screenshots/board.jpg) | ![Card detail with checklist](docs/screenshots/card-detail.jpg) |
 
 ## Local development
 
@@ -54,14 +54,14 @@ pnpm --filter web test        # unit tests (Angular/Karma)
 pnpm --filter web e2e         # browser e2e (Playwright), needs the stack running
 ```
 
-## Decisiones técnicas
+## Technical decisions
 
-Las decisiones no obvias están documentadas como ADRs en [docs/adr](docs/adr):
+Non-obvious decisions are documented as ADRs in [docs/adr](docs/adr):
 
-- **Autorización por membresía de tablero**, no roles globales — Trello no tiene jerarquía de roles, el permiso es una relación persona-tablero ([0001](docs/adr/0001-board-membership-authorization.md)).
-- **SSE en vez de WebSockets** para las actualizaciones en tiempo real — todas las escrituras ya van por REST, así que solo faltaba el sentido servidor→cliente, y `EventSource` lo da gratis con reconexión incluida ([0002](docs/adr/0002-sse-over-websockets.md)).
-- **Un único log de eventos** alimenta tiempo real, actividad y notificaciones a la vez, en lugar de tres subsistemas separados ([0003](docs/adr/0003-single-event-log.md)).
-- **Posiciones float dispersas** para el orden de listas/tarjetas por drag-and-drop — una sola fila se actualiza por movimiento, sin reescribir todos los hermanos ([0006](docs/adr/0006-float-positions.md)).
+- **Board-membership authorization**, not global roles — Trello has no role hierarchy, permission is a person-board relationship ([0001](docs/adr/0001-board-membership-authorization.md)).
+- **SSE instead of WebSockets** for realtime updates — every write already goes through REST, so only the server→client direction was missing, and `EventSource` gives that for free with built-in reconnection ([0002](docs/adr/0002-sse-over-websockets.md)).
+- **A single event log** feeds realtime, activity and notifications at once, instead of three separate subsystems ([0003](docs/adr/0003-single-event-log.md)).
+- **Sparse float positions** for list/card drag-and-drop ordering — a single row is updated per move, instead of rewriting every sibling ([0006](docs/adr/0006-float-positions.md)).
 
 ## Project structure
 
