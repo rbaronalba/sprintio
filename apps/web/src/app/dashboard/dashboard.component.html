@@ -1,7 +1,12 @@
 <app-header />
 
 <ng-template #tile let-b>
-  <a [routerLink]="['/boards', b.id]" [class.has-bg]="b.background" [style]="bgStyle(b.background)">{{ b.title }}</a>
+  <a
+    [routerLink]="['/boards', b.id]"
+    [class.has-bg]="b.background"
+    [style]="bgStyle(b.background)"
+    >{{ b.title }}</a
+  >
   <button
     type="button"
     class="star-btn"
@@ -11,17 +16,22 @@
     [title]="b.starred ? 'Quitar de destacados' : 'Destacar tablero'"
     (click)="toggleStar(b)"
   >
-    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" [attr.fill-opacity]="b.starred ? 1 : 0" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" d="M8 1.6l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.4l-3.8 2 .7-4.3-3.1-3 4.3-.6z" /></svg>
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+      <path
+        fill="currentColor"
+        [attr.fill-opacity]="b.starred ? 1 : 0"
+        stroke="currentColor"
+        stroke-width="1.3"
+        stroke-linejoin="round"
+        d="M8 1.6l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.4l-3.8 2 .7-4.3-3.1-3 4.3-.6z"
+      />
+    </svg>
   </button>
 </ng-template>
 
 <div class="layout">
   <nav class="sidebar" aria-label="Principal">
-    <a
-      routerLink="/boards"
-      routerLinkActive="active"
-      class="nav-item"
-    >
+    <a routerLink="/boards" routerLinkActive="active" class="nav-item">
       <span class="nav-icon" aria-hidden="true">&#9638;</span> Tableros
     </a>
     <a
@@ -35,13 +45,21 @@
 
     <div class="nav-heading">
       <span>Espacios de trabajo</span>
-      <button type="button" class="icon-btn" aria-label="Crear espacio de trabajo" title="Crear espacio de trabajo" (click)="openCreateWorkspace()">
+      <button
+        type="button"
+        class="icon-btn"
+        aria-label="Crear espacio de trabajo"
+        title="Crear espacio de trabajo"
+        (click)="openCreateWorkspace()"
+      >
         +
       </button>
     </div>
     @for (w of workspaces(); track w.id) {
       <a [routerLink]="['/w', w.id]" routerLinkActive="active" class="nav-item">
-        <span class="ws-mark" [style]="avatarStyle(w.id)" aria-hidden="true">{{ w.name.charAt(0).toUpperCase() }}</span>
+        <span class="ws-mark" [style]="avatarStyle(w.id)" aria-hidden="true">{{
+          w.name.charAt(0).toUpperCase()
+        }}</span>
         <span class="ws-name">{{ w.name }}</span>
       </a>
     } @empty {
@@ -54,14 +72,26 @@
       <div class="home">
         <section class="home-main">
           @if (auth.currentUser(); as user) {
-            <p class="greeting">Hola de nuevo, <strong data-testid="current-user">{{ user.displayName || user.email }}</strong></p>
+            <p class="greeting">
+              Hola de nuevo,
+              <strong data-testid="current-user">{{
+                user.displayName || user.email
+              }}</strong>
+            </p>
           }
           @if (starred().length) {
             <section class="starred" aria-label="Tableros destacados">
-              <h2 class="group-title"><span class="star" aria-hidden="true">&#9733;</span> Tableros destacados</h2>
+              <h2 class="group-title">
+                <span class="star" aria-hidden="true">&#9733;</span> Tableros
+                destacados
+              </h2>
               <ul class="board-grid">
                 @for (b of starred(); track b.id) {
-              <li class="board-tile"><ng-container *ngTemplateOutlet="tile; context: { $implicit: b }" /></li>
+                  <li class="board-tile">
+                    <ng-container
+                      *ngTemplateOutlet="tile; context: { $implicit: b }"
+                    />
+                  </li>
                 }
               </ul>
             </section>
@@ -75,16 +105,31 @@
               </div>
             </div>
             <h2>Organiza lo que quieras</h2>
-            <p>Ponlo todo en un solo sitio y empieza a avanzar con tu primer tablero de Sprintio.</p>
-            <button type="button" class="btn btn-primary" (click)="openCreateBoard()">Crear un tablero</button>
+            <p>
+              Ponlo todo en un solo sitio y empieza a avanzar con tu primer
+              tablero de Sprintio.
+            </p>
+            <button
+              type="button"
+              class="btn btn-primary"
+              (click)="openCreateBoard()"
+            >
+              Crear un tablero
+            </button>
           </div>
         </section>
 
         <aside class="home-side">
-          <p class="side-heading"><span aria-hidden="true">&#9719;</span> Vistos recientemente</p>
+          <p class="side-heading">
+            <span aria-hidden="true">&#9719;</span> Vistos recientemente
+          </p>
           @for (b of recent(); track b.id) {
             <a class="side-row" [routerLink]="['/boards', b.id]">
-              <span class="thumb" [style]="avatarStyle(b.id)" aria-hidden="true"></span>
+              <span
+                class="thumb"
+                [style]="avatarStyle(b.id)"
+                aria-hidden="true"
+              ></span>
               <span class="side-text">
                 <span class="side-title">{{ b.title }}</span>
                 <span class="side-sub">{{ workspaceName(b.workspaceId) }}</span>
@@ -95,7 +140,11 @@
           }
 
           <p class="side-heading">Enlaces</p>
-          <button type="button" class="side-row side-create" (click)="openCreateBoard()">
+          <button
+            type="button"
+            class="side-row side-create"
+            (click)="openCreateBoard()"
+          >
             <span class="thumb thumb-plus" aria-hidden="true">+</span>
             <span class="side-title">Crear un tablero nuevo</span>
           </button>
@@ -104,10 +153,16 @@
     } @else {
       @if (!workspaceId() && recent().length) {
         <section class="group" aria-label="Vistos recientemente">
-          <h2 class="group-title"><span aria-hidden="true">&#9719;</span> Vistos recientemente</h2>
+          <h2 class="group-title">
+            <span aria-hidden="true">&#9719;</span> Vistos recientemente
+          </h2>
           <ul class="board-grid">
             @for (b of recent(); track b.id) {
-              <li class="board-tile"><ng-container *ngTemplateOutlet="tile; context: { $implicit: b }" /></li>
+              <li class="board-tile">
+                <ng-container
+                  *ngTemplateOutlet="tile; context: { $implicit: b }"
+                />
+              </li>
             }
           </ul>
         </section>
@@ -119,7 +174,12 @@
       @for (s of sections(); track s.workspace.id) {
         <section class="group" [attr.aria-label]="s.workspace.name">
           <h3 class="group-title">
-            <span class="ws-mark" [style]="avatarStyle(s.workspace.id)" aria-hidden="true">{{ s.workspace.name.charAt(0).toUpperCase() }}</span>
+            <span
+              class="ws-mark"
+              [style]="avatarStyle(s.workspace.id)"
+              aria-hidden="true"
+              >{{ s.workspace.name.charAt(0).toUpperCase() }}</span
+            >
             @if (renamingWs() === s.workspace.id) {
               <input
                 #wsRename
@@ -127,7 +187,7 @@
                 class="ws-rename"
                 maxlength="60"
                 aria-label="Nombre del espacio de trabajo"
-                autofocus
+                appAutofocus
                 [value]="s.workspace.name"
                 (keydown.enter)="renameWorkspace(s.workspace, wsRename.value)"
                 (keydown.escape)="renamingWs.set(null)"
@@ -139,11 +199,29 @@
             @if (renamingWs() !== s.workspace.id) {
               <span class="ws-actions">
                 @if (s.workspace.isMember) {
-                  <button type="button" class="text-btn" (click)="openMembers(s.workspace)">Miembros</button>
+                  <button
+                    type="button"
+                    class="text-btn"
+                    (click)="openMembers(s.workspace)"
+                  >
+                    Miembros
+                  </button>
                 }
                 @if (isOwner(s.workspace)) {
-                  <button type="button" class="text-btn" (click)="renamingWs.set(s.workspace.id)">Renombrar</button>
-                  <button type="button" class="text-btn text-btn--danger" (click)="askDeleteWorkspace(s.workspace)">Eliminar</button>
+                  <button
+                    type="button"
+                    class="text-btn"
+                    (click)="renamingWs.set(s.workspace.id)"
+                  >
+                    Renombrar
+                  </button>
+                  <button
+                    type="button"
+                    class="text-btn text-btn--danger"
+                    (click)="askDeleteWorkspace(s.workspace)"
+                  >
+                    Eliminar
+                  </button>
                 }
               </span>
             }
@@ -151,9 +229,16 @@
           <ul class="board-grid">
             @for (board of s.boards; track board.id) {
               <li class="board-tile">
-                <ng-container *ngTemplateOutlet="tile; context: { $implicit: board }" />
+                <ng-container
+                  *ngTemplateOutlet="tile; context: { $implicit: board }"
+                />
                 @if (board.ownerId === auth.currentUser()?.sub) {
-                  <button type="button" class="icon-btn" (click)="askDelete(board)" aria-label="Eliminar tablero">
+                  <button
+                    type="button"
+                    class="icon-btn"
+                    (click)="askDelete(board)"
+                    aria-label="Eliminar tablero"
+                  >
                     &times;
                   </button>
                 }
@@ -162,26 +247,42 @@
             @if (s.workspace.isMember) {
               <li class="board-tile board-tile--new">
                 @if (creatingIn() === s.workspace.id) {
-                  <form [formGroup]="form" (ngSubmit)="createBoard(s.workspace.id)">
+                  <form
+                    [formGroup]="form"
+                    (ngSubmit)="createBoard(s.workspace.id)"
+                  >
                     <input
                       type="text"
                       formControlName="title"
                       placeholder="Título del tablero"
                       aria-label="Título del tablero"
-                      autofocus
+                      appAutofocus
                       (keydown.escape)="creatingIn.set(null)"
                     />
                     <div class="new-actions">
-                      <button type="submit" class="btn btn-primary" [disabled]="form.invalid || pending()">
+                      <button
+                        type="submit"
+                        class="btn btn-primary"
+                        [disabled]="form.invalid || pending()"
+                      >
                         Crear
                       </button>
-                      <button type="button" class="icon-btn" aria-label="Cancelar" (click)="creatingIn.set(null)">
+                      <button
+                        type="button"
+                        class="icon-btn"
+                        aria-label="Cancelar"
+                        (click)="creatingIn.set(null)"
+                      >
                         &times;
                       </button>
                     </div>
                   </form>
                 } @else {
-                  <button type="button" class="new-trigger" (click)="startCreate(s.workspace.id)">
+                  <button
+                    type="button"
+                    class="new-trigger"
+                    (click)="startCreate(s.workspace.id)"
+                  >
                     + Nuevo tablero
                   </button>
                 }
@@ -191,8 +292,17 @@
         </section>
       } @empty {
         <div class="empty">
-          <p>Aún no tienes espacios de trabajo. Un espacio de trabajo agrupa tableros, por ejemplo uno por departamento.</p>
-          <button type="button" class="btn btn-primary" (click)="openCreateWorkspace()">Crear un espacio de trabajo</button>
+          <p>
+            Aún no tienes espacios de trabajo. Un espacio de trabajo agrupa
+            tableros, por ejemplo uno por departamento.
+          </p>
+          <button
+            type="button"
+            class="btn btn-primary"
+            (click)="openCreateWorkspace()"
+          >
+            Crear un espacio de trabajo
+          </button>
         </div>
       }
     }
@@ -202,11 +312,26 @@
 <dialog #workspaceDialog class="confirm-dialog">
   <form (submit)="$event.preventDefault(); createWorkspace(wsName)">
     <p class="label-caps">Crear espacio de trabajo</p>
-    <label class="label-caps" for="workspace-name">Nombre del espacio de trabajo</label>
-    <input #wsName id="workspace-name" type="text" maxlength="60" placeholder="p. ej. Software" autocomplete="off" />
+    <label class="label-caps" for="workspace-name"
+      >Nombre del espacio de trabajo</label
+    >
+    <input
+      #wsName
+      id="workspace-name"
+      type="text"
+      maxlength="60"
+      placeholder="p. ej. Software"
+      autocomplete="off"
+    />
     <div class="dialog-actions">
       <button type="submit" class="btn btn-primary">Crear</button>
-      <button type="button" class="btn btn-outline" (click)="workspaceDialog.close()">Cancelar</button>
+      <button
+        type="button"
+        class="btn btn-outline"
+        (click)="workspaceDialog.close()"
+      >
+        Cancelar
+      </button>
     </div>
   </form>
 </dialog>
@@ -217,38 +342,87 @@
     @if (isOwner(w)) {
       @if (shareLink(); as link) {
         <p class="dialog-note">
-          Cualquier persona con sesión iniciada que abra este enlace se une al espacio de trabajo y a
-          todos sus tableros. Dejar de compartir anula el enlace; quienes ya se unieron conservan el acceso.
+          Cualquier persona con sesión iniciada que abra este enlace se une al
+          espacio de trabajo y a todos sus tableros. Dejar de compartir anula el
+          enlace; quienes ya se unieron conservan el acceso.
         </p>
-        <input #linkInput type="text" readonly [value]="link" aria-label="Enlace de invitación al espacio de trabajo" />
+        <input
+          #linkInput
+          type="text"
+          readonly
+          [value]="link"
+          aria-label="Enlace de invitación al espacio de trabajo"
+        />
         <div class="dialog-actions">
-          <button type="button" class="btn btn-primary" (click)="copyLink(linkInput)">Copiar enlace</button>
-          <button type="button" class="btn btn-outline" (click)="stopSharing()">Dejar de compartir</button>
+          <button
+            type="button"
+            class="btn btn-primary"
+            (click)="copyLink(linkInput)"
+          >
+            Copiar enlace
+          </button>
+          <button type="button" class="btn btn-outline" (click)="stopSharing()">
+            Dejar de compartir
+          </button>
         </div>
       } @else {
-        <p class="dialog-note">Invita a gente a todos los tableros de este espacio de trabajo con un enlace.</p>
+        <p class="dialog-note">
+          Invita a gente a todos los tableros de este espacio de trabajo con un
+          enlace.
+        </p>
         <div class="dialog-actions">
-          <button type="button" class="btn btn-primary" (click)="createInvite()">Crear enlace de invitación</button>
+          <button
+            type="button"
+            class="btn btn-primary"
+            (click)="createInvite()"
+          >
+            Crear enlace de invitación
+          </button>
         </div>
       }
     }
     <ul class="member-list">
       @for (m of members(); track m.userId) {
         <li>
-          <span class="member-avatar" [style]="avatarStyle(m.userId)" aria-hidden="true">{{ initials(m.displayName, m.email) }}</span>
-          <span class="member-name" [title]="m.email">{{ m.displayName || m.email }}</span>
+          <span
+            class="member-avatar"
+            [style]="avatarStyle(m.userId)"
+            aria-hidden="true"
+            >{{ initials(m.displayName, m.email) }}</span
+          >
+          <span class="member-name" [title]="m.email">{{
+            m.displayName || m.email
+          }}</span>
           @if (m.userId === w.ownerId) {
             <span class="member-role">Administrador</span>
           } @else if (m.userId === auth.currentUser()?.sub) {
-            <button type="button" class="text-btn text-btn--danger" (click)="askRemoveMember(m)">Salir</button>
+            <button
+              type="button"
+              class="text-btn text-btn--danger"
+              (click)="askRemoveMember(m)"
+            >
+              Salir
+            </button>
           } @else if (isOwner(w)) {
-            <button type="button" class="text-btn text-btn--danger" (click)="askRemoveMember(m)">Quitar</button>
+            <button
+              type="button"
+              class="text-btn text-btn--danger"
+              (click)="askRemoveMember(m)"
+            >
+              Quitar
+            </button>
           }
         </li>
       }
     </ul>
     <div class="dialog-actions">
-      <button type="button" class="btn btn-outline" (click)="membersDialog.close()">Cerrar</button>
+      <button
+        type="button"
+        class="btn btn-outline"
+        (click)="membersDialog.close()"
+      >
+        Cerrar
+      </button>
     </div>
   }
 </dialog>
@@ -256,13 +430,23 @@
 <dialog #confirmDialog class="confirm-dialog">
   <p>
     @if (pendingDelete()?.phrase) {
-      ¿Seguro que quieres {{ pendingDelete()?.title }}? {{ pendingDelete()?.warning }}
+      ¿Seguro que quieres {{ pendingDelete()?.title }}?
+      {{ pendingDelete()?.warning }}
     } @else {
-      ¿Seguro que quieres eliminar <strong>{{ pendingDelete()?.title }}</strong>? {{ pendingDelete()?.warning }}
+      ¿Seguro que quieres eliminar <strong>{{ pendingDelete()?.title }}</strong
+      >? {{ pendingDelete()?.warning }}
     }
   </p>
   <div class="dialog-actions">
-    <button type="button" class="btn btn-primary" (click)="confirmDelete()">{{ pendingDelete()?.phrase ? 'Confirmar' : 'Eliminar' }}</button>
-    <button type="button" class="btn btn-outline" (click)="confirmDialog.close()">Cancelar</button>
+    <button type="button" class="btn btn-primary" (click)="confirmDelete()">
+      {{ pendingDelete()?.phrase ? 'Confirmar' : 'Eliminar' }}
+    </button>
+    <button
+      type="button"
+      class="btn btn-outline"
+      (click)="confirmDialog.close()"
+    >
+      Cancelar
+    </button>
   </div>
 </dialog>

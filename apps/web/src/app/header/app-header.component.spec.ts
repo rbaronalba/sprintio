@@ -1,7 +1,15 @@
 import { Component } from '@angular/core';
-import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import {
+  ComponentFixture,
+  TestBed,
+  fakeAsync,
+  tick,
+} from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
-import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import {
+  HttpTestingController,
+  provideHttpClientTesting,
+} from '@angular/common/http/testing';
 import { Router, provideRouter } from '@angular/router';
 import { AuthService } from '../auth/auth.service';
 import { AppHeaderComponent } from './app-header.component';
@@ -25,10 +33,17 @@ describe('AppHeaderComponent', () => {
     });
     httpMock = TestBed.inject(HttpTestingController);
 
-    TestBed.inject(AuthService).login('dev@sprintio.test', 'password123').subscribe();
+    TestBed.inject(AuthService)
+      .login('dev@sprintio.test', 'password123')
+      .subscribe();
     httpMock.expectOne('/auth/login').flush({
       accessToken: 'token-1',
-      user: { sub: '1', email: 'dev@sprintio.test', role: 'DEVELOPER', displayName: 'Dev Driver' },
+      user: {
+        sub: '1',
+        email: 'dev@sprintio.test',
+        role: 'DEVELOPER',
+        displayName: 'Dev Driver',
+      },
     });
     fixture = TestBed.createComponent(AppHeaderComponent);
   });
@@ -41,7 +56,9 @@ describe('AppHeaderComponent', () => {
 
   it('shows the initials of the signed-in user in the account button', () => {
     fixture.detectChanges();
-    const avatar: HTMLElement = fixture.nativeElement.querySelector('button[aria-label="Cuenta"]');
+    const avatar: HTMLElement = fixture.nativeElement.querySelector(
+      'button[aria-label="Cuenta"]',
+    );
     expect(avatar.textContent?.trim()).toBe('DD');
   });
 
@@ -49,13 +66,20 @@ describe('AppHeaderComponent', () => {
     fixture.componentInstance.saveProfile('  Rubén  ');
     const req = httpMock.expectOne('/auth/profile');
     expect(req.request.body).toEqual({ displayName: 'Rubén' });
-    req.flush({ sub: '1', email: 'dev@sprintio.test', role: 'DEVELOPER', displayName: 'Rubén' });
+    req.flush({
+      sub: '1',
+      email: 'dev@sprintio.test',
+      role: 'DEVELOPER',
+      displayName: 'Rubén',
+    });
   });
 
   it('lists recent boards on focus, then searches cards only from two characters on', fakeAsync(() => {
     fixture.detectChanges();
     fixture.componentInstance.openSearch();
-    httpMock.expectOne('/boards').flush([{ id: 'b1', title: 'Monaco', ownerId: '1' }]);
+    httpMock
+      .expectOne('/boards')
+      .flush([{ id: 'b1', title: 'Monaco', ownerId: '1' }]);
 
     fixture.componentInstance.onInput('c');
     tick(300);

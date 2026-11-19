@@ -18,7 +18,11 @@ import { Observable, finalize, interval, map, merge, tap } from 'rxjs';
 import { REDIS, type RedisClients } from '../redis/redis.module.js';
 import { EventsService } from './events.service.js';
 import { NotificationsService } from './notifications.service.js';
-import { JWT_ALGORITHM, STREAM_AUDIENCE, type JwtPayload } from '../auth/auth.service.js';
+import {
+  JWT_ALGORITHM,
+  STREAM_AUDIENCE,
+  type JwtPayload,
+} from '../auth/auth.service.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
 
@@ -43,7 +47,9 @@ export class EventsController {
   constructor(
     private readonly events: EventsService,
     private readonly jwt: JwtService,
-    @Optional() @Inject(REDIS) private readonly redis: RedisClients | null = null,
+    @Optional()
+    @Inject(REDIS)
+    private readonly redis: RedisClients | null = null,
   ) {}
 
   /**
@@ -65,7 +71,9 @@ export class EventsController {
   @Sse('stream')
   // nginx buffers proxied responses by default, which holds events back until the buffer fills.
   @Header('X-Accel-Buffering', 'no')
-  async stream(@Query('ticket') ticket: string): Promise<Observable<SsePayload>> {
+  async stream(
+    @Query('ticket') ticket: string,
+  ): Promise<Observable<SsePayload>> {
     const userId = await this.userFromTicket(ticket);
 
     const slot = await this.claimSlot(userId);
@@ -74,7 +82,9 @@ export class EventsController {
       tap(() => void slot.touch()),
       map(() => ({ data: { type: 'ping' } })),
     );
-    const events = this.events.streamFor(userId).pipe(map((message) => ({ data: { ...message } })));
+    const events = this.events
+      .streamFor(userId)
+      .pipe(map((message) => ({ data: { ...message } })));
 
     return merge(events, heartbeat).pipe(finalize(() => void slot.release()));
   }
@@ -83,10 +93,14 @@ export class EventsController {
    * Counts the user's open streams across every api instance: a Redis sorted set of
    * stream id -> last heartbeat, so streams on an instance that died age out on their own.
    */
-  private async claimSlot(userId: string): Promise<{ touch: () => Promise<unknown>; release: () => Promise<unknown> }> {
+  private async claimSlot(userId: string): Promise<{
+    touch: () => Promise<unknown>;
+    release: () => Promise<unknown>;
+  }> {
     if (!this.redis) {
       const open = this.openStreams.get(userId) ?? 0;
-      if (open >= MAX_STREAMS_PER_USER) throw new UnauthorizedException('Too many open streams');
+      if (open >= MAX_STREAMS_PER_USER)
+        throw new UnauthorizedException('Too many open streams');
       this.openStreams.set(userId, open + 1);
       return {
         touch: async () => {},
@@ -102,8 +116,14 @@ export class EventsController {
     const id = randomUUID();
     await redis.zremrangebyscore(key, '-inf', Date.now() - STREAM_STALE_MS);
     // ponytail: count-then-add is not atomic, so a burst can overshoot the cap by a stream or two; it is a soft cap.
-    if ((await redis.zcard(key)) >= MAX_STREAMS_PER_USER) throw new UnauthorizedException('Too many open streams');
-    const touch = () => redis.multi().zadd(key, Date.now(), id).pexpire(key, STREAM_STALE_MS).exec();
+    if ((await redis.zcard(key)) >= MAX_STREAMS_PER_USER)
+      throw new UnauthorizedException('Too many open streams');
+    const touch = () =>
+      redis
+        .multi()
+        .zadd(key, Date.now(), id)
+        .pexpire(key, STREAM_STALE_MS)
+        .exec();
     await touch();
     return { touch, release: () => redis.zrem(key, id) };
   }
@@ -136,7 +156,9 @@ export class NotificationsController {
   markRead(@CurrentUser() user: JwtPayload, @Body() body: unknown) {
     const { ids } = (body ?? {}) as { ids?: unknown };
     // No ids means "mark everything read", which is what opening the bell does.
-    const only = Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : undefined;
+    const only = Array.isArray(ids)
+      ? ids.filter((id): id is string => typeof id === 'string')
+      : undefined;
     return this.notifications.markRead(user.sub, only);
   }
 }

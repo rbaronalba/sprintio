@@ -11,6 +11,10 @@ export function dropsUntilRenumber(): number {
     const placed = place(siblings, 'a')!;
     if (placed.renumber) return drops;
     drops++;
-    siblings = [siblings[0], { id: `n${drops}`, position: placed.position }, ...siblings.slice(1)];
+    siblings = [
+      siblings[0],
+      { id: `n${drops}`, position: placed.position },
+      ...siblings.slice(1),
+    ];
   }
 }

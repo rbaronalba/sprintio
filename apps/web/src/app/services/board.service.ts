@@ -97,8 +97,14 @@ export class BoardService {
   }
 
   /** A File uploads an image; a string sets a palette color, or '' clears it. */
-  setListBackground(id: string, value: string | File): Observable<{ background: string }> {
-    return this.http.post<{ background: string }>(`/lists/${id}/background`, backgroundBody(value));
+  setListBackground(
+    id: string,
+    value: string | File,
+  ): Observable<{ background: string }> {
+    return this.http.post<{ background: string }>(
+      `/lists/${id}/background`,
+      backgroundBody(value),
+    );
   }
 
   removeList(id: string): Observable<unknown> {
@@ -127,7 +133,11 @@ export class BoardService {
   }
 
   /** Lands the card right after `afterId` (null = top) in `listId`; the server picks the position. */
-  moveCard(id: string, listId: string, afterId: string | null): Observable<Moved> {
+  moveCard(
+    id: string,
+    listId: string,
+    afterId: string | null,
+  ): Observable<Moved> {
     return this.http.patch<Moved>(`/cards/${id}`, { listId, afterId });
   }
 
@@ -153,12 +163,19 @@ export class BoardService {
 
   /** Oldest-first page of up to COMMENT_PAGE; `before` asks for the page older than that comment. */
   listComments(cardId: string, before?: string): Observable<Comment[]> {
-    return this.http.get<Comment[]>(`/cards/${cardId}/comments`, { params: before ? { before } : {} });
+    return this.http.get<Comment[]>(`/cards/${cardId}/comments`, {
+      params: before ? { before } : {},
+    });
   }
 
   /** With a file the comment is posted as multipart, the image attached to it. */
-  addComment(cardId: string, body: string, file?: File | null): Observable<Comment> {
-    if (!file) return this.http.post<Comment>(`/cards/${cardId}/comments`, { body });
+  addComment(
+    cardId: string,
+    body: string,
+    file?: File | null,
+  ): Observable<Comment> {
+    if (!file)
+      return this.http.post<Comment>(`/cards/${cardId}/comments`, { body });
     const form = new FormData();
     form.append('body', body);
     form.append('file', file);
@@ -177,12 +194,23 @@ export class BoardService {
     return this.http.get<TimeEntry[]>(`/cards/${cardId}/time`);
   }
 
-  addTimeEntry(cardId: string, date: string, hours: number, note?: string, userId?: string): Observable<TimeEntry> {
-    return this.http.post<TimeEntry>(`/cards/${cardId}/time`, { date, hours, note, userId });
+  addTimeEntry(
+    cardId: string,
+    entry: { date: string; hours: number; note?: string; userId?: string },
+  ): Observable<TimeEntry> {
+    return this.http.post<TimeEntry>(`/cards/${cardId}/time`, entry);
   }
 
-  updateTimeEntry(cardId: string, entryId: string, hours: number, note: string | null): Observable<TimeEntry> {
-    return this.http.patch<TimeEntry>(`/cards/${cardId}/time/${entryId}`, { hours, note });
+  updateTimeEntry(
+    cardId: string,
+    entryId: string,
+    hours: number,
+    note: string | null,
+  ): Observable<TimeEntry> {
+    return this.http.patch<TimeEntry>(`/cards/${cardId}/time/${entryId}`, {
+      hours,
+      note,
+    });
   }
 
   removeTimeEntry(cardId: string, entryId: string): Observable<unknown> {
@@ -202,10 +230,16 @@ export class BoardService {
   }
 
   addChecklistItem(cardId: string, text: string): Observable<ChecklistItem> {
-    return this.http.post<ChecklistItem>(`/cards/${cardId}/checklist`, { text });
+    return this.http.post<ChecklistItem>(`/cards/${cardId}/checklist`, {
+      text,
+    });
   }
 
-  updateChecklistItem(cardId: string, itemId: string, patch: { text?: string; done?: boolean }): Observable<unknown> {
+  updateChecklistItem(
+    cardId: string,
+    itemId: string,
+    patch: { text?: string; done?: boolean },
+  ): Observable<unknown> {
     return this.http.patch(`/cards/${cardId}/checklist/${itemId}`, patch);
   }
 
@@ -214,7 +248,9 @@ export class BoardService {
   }
 }
 
-export function backgroundBody(value: string | File): FormData | { background: string } {
+export function backgroundBody(
+  value: string | File,
+): FormData | { background: string } {
   if (typeof value === 'string') return { background: value };
   const form = new FormData();
   form.append('file', value);

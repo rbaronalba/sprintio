@@ -1,4 +1,9 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  inject,
+  signal,
+} from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { RouterLink } from '@angular/router';
 import { AuthService, Role } from '../auth/auth.service';
@@ -29,7 +34,12 @@ interface AdminUser {
       }
       <table>
         <thead>
-          <tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Acciones</th></tr>
+          <tr>
+            <th>Usuario</th>
+            <th>Rol</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
         </thead>
         <tbody>
           @for (u of users(); track u.id) {
@@ -39,24 +49,51 @@ interface AdminUser {
                 <span class="muted">{{ u.email }}</span>
               </td>
               <td>
-                <select #role aria-label="Rol" [disabled]="u.id === me" (change)="patch(u, { role: role.value })">
+                <select
+                  #role
+                  aria-label="Rol"
+                  [disabled]="u.id === me"
+                  (change)="patch(u, { role: role.value })"
+                >
                   @for (r of roles; track r) {
-                    <option [value]="r" [selected]="r === u.role">{{ r }}</option>
+                    <option [value]="r" [selected]="r === u.role">
+                      {{ r }}
+                    </option>
                   }
                 </select>
               </td>
               <td>{{ u.disabledAt ? 'Desactivado' : 'Activo' }}</td>
               <td class="actions">
                 @if (u.id !== me) {
-                  <button type="button" class="btn btn-outline" (click)="setDisabled(u)">{{ u.disabledAt ? 'Activar' : 'Desactivar' }}</button>
-                  <button type="button" class="btn btn-outline" (click)="resetPassword(u)">Restablecer contraseña</button>
+                  <button
+                    type="button"
+                    class="btn btn-outline"
+                    (click)="setDisabled(u)"
+                  >
+                    {{ u.disabledAt ? 'Activar' : 'Desactivar' }}
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-outline"
+                    (click)="resetPassword(u)"
+                  >
+                    Restablecer contraseña
+                  </button>
                 }
                 @if (u.owned) {
-                  <select #to aria-label="Traspasar tableros a" (change)="transfer(u, to)">
-                    <option value="">Traspasar sus {{ u.owned }} tableros/espacios a&hellip;</option>
+                  <select
+                    #to
+                    aria-label="Traspasar tableros a"
+                    (change)="transfer(u, to)"
+                  >
+                    <option value="">
+                      Traspasar sus {{ u.owned }} tableros/espacios a&hellip;
+                    </option>
                     @for (t of users(); track t.id) {
                       @if (t.id !== u.id && !t.disabledAt) {
-                        <option [value]="t.id">{{ t.displayName || t.email }}</option>
+                        <option [value]="t.id">
+                          {{ t.displayName || t.email }}
+                        </option>
                       }
                     }
                   </select>
@@ -69,15 +106,49 @@ interface AdminUser {
     </main>
   `,
   styles: `
-    :host { display: block; min-height: 100vh; background: var(--canvas); }
-    main { max-width: 1000px; margin: 0 auto; padding: var(--space-lg) var(--space-sm); }
-    .back { color: var(--body); text-decoration: none; }
-    h1 { margin: var(--space-xs) 0; font-size: 26px; font-weight: 500; }
-    .note { color: var(--body); user-select: all; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { padding: var(--space-xxs); text-align: left; border-bottom: 1px solid var(--hairline); }
-    .muted { display: block; color: var(--muted); font-size: 13px; }
-    .actions { display: flex; flex-wrap: wrap; gap: var(--space-xxs); }
+    :host {
+      display: block;
+      min-height: 100vh;
+      background: var(--canvas);
+    }
+    main {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: var(--space-lg) var(--space-sm);
+    }
+    .back {
+      color: var(--body);
+      text-decoration: none;
+    }
+    h1 {
+      margin: var(--space-xs) 0;
+      font-size: 26px;
+      font-weight: 500;
+    }
+    .note {
+      color: var(--body);
+      user-select: all;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th,
+    td {
+      padding: var(--space-xxs);
+      text-align: left;
+      border-bottom: 1px solid var(--hairline);
+    }
+    .muted {
+      display: block;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-xxs);
+    }
   `,
 })
 export class AdminComponent {
@@ -88,44 +159,81 @@ export class AdminComponent {
   readonly notice = signal('');
 
   private readonly fail = (e: HttpErrorResponse) =>
-    this.notice.set(e.status === 403 ? 'Solo los administradores pueden gestionar usuarios.' : (e.error?.message ?? 'Algo ha fallado'));
+    this.notice.set(
+      e.status === 403
+        ? 'Solo los administradores pueden gestionar usuarios.'
+        : (e.error?.message ?? 'Algo ha fallado'),
+    );
 
   constructor() {
     this.load();
   }
 
   private load(): void {
-    this.http.get<AdminUser[]>('/auth/admin/users').subscribe({ next: (users) => this.users.set(users), error: this.fail });
+    this.http
+      .get<AdminUser[]>('/auth/admin/users')
+      .subscribe({ next: (users) => this.users.set(users), error: this.fail });
   }
 
   patch(user: AdminUser, body: { role?: string; disabled?: boolean }): void {
-    this.http.patch(`/auth/admin/users/${user.id}`, body).subscribe({ next: () => this.load(), error: this.fail });
+    this.http
+      .patch(`/auth/admin/users/${user.id}`, body)
+      .subscribe({ next: () => this.load(), error: this.fail });
   }
 
   setDisabled(user: AdminUser): void {
     const disable = !user.disabledAt;
-    if (disable && !confirm(`¿Desactivar a ${user.email}? Se cerrará su sesión y no podrá volver a entrar.`)) return;
+    if (
+      disable &&
+      !confirm(
+        `¿Desactivar a ${user.email}? Se cerrará su sesión y no podrá volver a entrar.`,
+      )
+    )
+      return;
     this.patch(user, { disabled: disable });
   }
 
   resetPassword(user: AdminUser): void {
-    if (!confirm(`¿Restablecer la contraseña de ${user.email}? Se cerrará su sesión en todos los dispositivos.`)) return;
-    this.http.post<{ password: string }>(`/auth/admin/users/${user.id}/password`, {}).subscribe({
-      next: ({ password }) => this.notice.set(`Nueva contraseña de ${user.email}: ${password} (solo se muestra una vez; pídele que la cambie)`),
-      error: this.fail,
-    });
+    if (
+      !confirm(
+        `¿Restablecer la contraseña de ${user.email}? Se cerrará su sesión en todos los dispositivos.`,
+      )
+    )
+      return;
+    this.http
+      .post<{ password: string }>(`/auth/admin/users/${user.id}/password`, {})
+      .subscribe({
+        next: ({ password }) =>
+          this.notice.set(
+            `Nueva contraseña de ${user.email}: ${password} (solo se muestra una vez; pídele que la cambie)`,
+          ),
+        error: this.fail,
+      });
   }
 
   transfer(user: AdminUser, select: HTMLSelectElement): void {
     const toUserId = select.value;
     select.value = '';
-    if (!toUserId || !confirm(`¿Traspasar todos los tableros y espacios de trabajo de ${user.email}?`)) return;
-    this.http.post<{ boards: number; workspaces: number }>(`/auth/admin/users/${user.id}/transfer`, { toUserId }).subscribe({
-      next: (r) => {
-        this.notice.set(`Traspasados ${r.boards} tableros y ${r.workspaces} espacios de trabajo.`);
-        this.load();
-      },
-      error: this.fail,
-    });
+    if (
+      !toUserId ||
+      !confirm(
+        `¿Traspasar todos los tableros y espacios de trabajo de ${user.email}?`,
+      )
+    )
+      return;
+    this.http
+      .post<{ boards: number; workspaces: number }>(
+        `/auth/admin/users/${user.id}/transfer`,
+        { toUserId },
+      )
+      .subscribe({
+        next: (r) => {
+          this.notice.set(
+            `Traspasados ${r.boards} tableros y ${r.workspaces} espacios de trabajo.`,
+          );
+          this.load();
+        },
+        error: this.fail,
+      });
   }
 }

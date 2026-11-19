@@ -17,9 +17,24 @@ return { hits, ttl, redis.call('PTTL', KEYS[2]) }
 export class RedisThrottlerStorage implements ThrottlerStorage {
   constructor(private readonly redis: Redis) {}
 
-  async increment(key: string, ttl: number, limit: number, blockDuration: number, throttlerName: string) {
+  // oxlint-disable-next-line max-params -- signature dictated by the ThrottlerStorage interface
+  async increment(
+    key: string,
+    ttl: number,
+    limit: number,
+    blockDuration: number,
+    throttlerName: string,
+  ) {
     const base = `throttle:${throttlerName}:${key}`;
-    const [hits, ttlMs, blockMs] = (await this.redis.eval(SCRIPT, 2, base, `${base}:block`, ttl, limit, blockDuration || ttl)) as number[];
+    const [hits, ttlMs, blockMs] = (await this.redis.eval(
+      SCRIPT,
+      2,
+      base,
+      `${base}:block`,
+      ttl,
+      limit,
+      blockDuration || ttl,
+    )) as number[];
     const isBlocked = blockMs > 0;
     return {
       totalHits: hits,

@@ -31,7 +31,11 @@ export class BoardListsController {
   }
 
   @Post()
-  create(@CurrentUser() user: JwtPayload, @Param('boardId') boardId: string, @Body() body: unknown) {
+  create(
+    @CurrentUser() user: JwtPayload,
+    @Param('boardId') boardId: string,
+    @Body() body: unknown,
+  ) {
     const { title } = parseUpsertList(body);
     if (!title) throw new BadRequestException('Title is required');
     return this.lists.create(user.sub, boardId, title);
@@ -44,7 +48,11 @@ export class ListsController {
   constructor(private readonly lists: ListsService) {}
 
   @Patch(':id')
-  update(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() body: unknown) {
+  update(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
     return this.lists.update(user.sub, id, parseUpsertList(body));
   }
 
@@ -57,7 +65,11 @@ export class ListsController {
     @Body() body: unknown,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    return this.lists.setBackground(user.sub, id, file ? `/uploads/${file.filename}` : parseBackground(body));
+    return this.lists.setBackground(
+      user.sub,
+      id,
+      file ? `/uploads/${file.filename}` : parseBackground(body),
+    );
   }
 
   @Delete(':id')

@@ -33,6 +33,11 @@ import { MaintenanceService } from './maintenance.service.js';
     CardsModule,
   ],
   controllers: [AppController],
-  providers: [AppService, PrismaService, MaintenanceService, { provide: APP_GUARD, useClass: UserThrottlerGuard }],
+  providers: [
+    AppService,
+    PrismaService,
+    MaintenanceService,
+    { provide: APP_GUARD, useClass: UserThrottlerGuard },
+  ],
 })
 export class AppModule {}

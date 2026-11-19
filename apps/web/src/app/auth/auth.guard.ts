@@ -7,9 +7,15 @@ export const authGuard: CanActivateFn = (_route, state) => {
   const auth = inject(AuthService);
   const router = inject(Router);
 
-  return auth
-    .restoreSession()
-    .pipe(map((ok) => ok || router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } })));
+  return auth.restoreSession().pipe(
+    map(
+      (ok) =>
+        ok ||
+        router.createUrlTree(['/login'], {
+          queryParams: { returnUrl: state.url },
+        }),
+    ),
+  );
 };
 
 export const roleGuard = (...roles: Role[]): CanActivateFn => {
@@ -21,7 +27,9 @@ export const roleGuard = (...roles: Role[]): CanActivateFn => {
       map((ok) => {
         if (!ok) return router.createUrlTree(['/login']);
         const user = auth.currentUser();
-        return user !== null && roles.includes(user.role) ? true : router.createUrlTree(['/']);
+        return user !== null && roles.includes(user.role)
+          ? true
+          : router.createUrlTree(['/']);
       }),
     );
   };

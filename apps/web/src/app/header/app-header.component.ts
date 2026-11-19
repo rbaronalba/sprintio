@@ -1,10 +1,29 @@
-import { ChangeDetectionStrategy, Component, ElementRef, HostListener, inject, signal, viewChild } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  HostListener,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { Subject, debounceTime, distinctUntilChanged, switchMap, tap } from 'rxjs';
+import {
+  Subject,
+  debounceTime,
+  distinctUntilChanged,
+  switchMap,
+  tap,
+} from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '../auth/auth.service';
 import { NotificationBellComponent } from '../realtime/notification-bell.component';
-import { Board, BoardsService, SearchHit, Workspace } from '../services/boards.service';
+import {
+  Board,
+  BoardsService,
+  SearchHit,
+  Workspace,
+} from '../services/boards.service';
 import { avatarStyle, initials } from '../shared/avatar';
 
 @Component({
@@ -18,9 +37,11 @@ export class AppHeaderComponent {
   readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly boardsApi = inject(BoardsService);
-  private readonly profileDialog = viewChild.required<ElementRef<HTMLDialogElement>>('profileDialog');
+  private readonly profileDialog =
+    viewChild.required<ElementRef<HTMLDialogElement>>('profileDialog');
 
-  private readonly createDialog = viewChild.required<ElementRef<HTMLDialogElement>>('createDialog');
+  private readonly createDialog =
+    viewChild.required<ElementRef<HTMLDialogElement>>('createDialog');
 
   readonly avatarStyle = avatarStyle;
   readonly initials = initials;
@@ -37,7 +58,8 @@ export class AppHeaderComponent {
   /** The "+ Create workspace" option is picked: the dialog shows a name field for it. */
   readonly newWorkspace = signal(false);
   readonly NEW_WS = '__new__';
-  private readonly newWsField = viewChild<ElementRef<HTMLInputElement>>('newWsField');
+  private readonly newWsField =
+    viewChild<ElementRef<HTMLInputElement>>('newWsField');
   private readonly input$ = new Subject<string>();
 
   constructor() {
@@ -70,7 +92,9 @@ export class AppHeaderComponent {
       this.recent.set(
         // Opened ones first, most recent on top; never-opened ones after, newest first (API order).
         [...boards]
-          .sort((a, b) => (b.lastViewedAt ?? '').localeCompare(a.lastViewedAt ?? ''))
+          .sort((a, b) =>
+            (b.lastViewedAt ?? '').localeCompare(a.lastViewedAt ?? ''),
+          )
           .slice(0, 10),
       ),
     );
@@ -88,12 +112,17 @@ export class AppHeaderComponent {
   openBoard(id: string, cardId?: string): void {
     this.closeSearch();
     this.term.set('');
-    void this.router.navigate(['/boards', id], cardId ? { queryParams: { card: cardId } } : {});
+    void this.router.navigate(
+      ['/boards', id],
+      cardId ? { queryParams: { card: cardId } } : {},
+    );
   }
 
   openCreate(): void {
     this.newWorkspace.set(false);
-    this.boardsApi.listWorkspaces().subscribe((ws) => this.ownWorkspaces.set(ws.filter((w) => w.isMember)));
+    this.boardsApi
+      .listWorkspaces()
+      .subscribe((ws) => this.ownWorkspaces.set(ws.filter((w) => w.isMember)));
     this.createDialog().nativeElement.showModal();
   }
 
@@ -112,10 +141,12 @@ export class AppHeaderComponent {
       });
       return;
     }
-    this.boardsApi.create(title.trim(), workspaceId || undefined).subscribe((b) => {
-      this.createDialog().nativeElement.close();
-      this.openBoard(b.id);
-    });
+    this.boardsApi
+      .create(title.trim(), workspaceId || undefined)
+      .subscribe((b) => {
+        this.createDialog().nativeElement.close();
+        this.openBoard(b.id);
+      });
   }
 
   /** A click anywhere outside the search or account dropdown closes it. */

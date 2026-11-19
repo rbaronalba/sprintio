@@ -5,6 +5,10 @@ import { HttpTestingController } from '@angular/common/http/testing';
  * else answer both here so `httpMock.verify()` has nothing left over.
  */
 export function flushSessionRequests(httpMock: HttpTestingController): void {
-  httpMock.match('/events/ticket').forEach((req) => req.flush({ ticket: 'stream-ticket' }));
-  httpMock.match('/notifications').forEach((req) => req.flush({ unread: 0, items: [] }));
+  httpMock
+    .match('/events/ticket')
+    .forEach((req) => req.flush({ ticket: 'stream-ticket' }));
+  httpMock
+    .match('/notifications')
+    .forEach((req) => req.flush({ unread: 0, items: [] }));
 }

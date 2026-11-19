@@ -1,5 +1,10 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { BadRequestException, ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { Role, User } from '../generated/prisma/client.js';
@@ -57,7 +62,11 @@ const ROTATION_GRACE_MS = 10_000;
 const MAX_SESSIONS_PER_USER = 10;
 /** Comma-separated emails made ADMIN when they sign in. */
 const ADMIN_EMAILS = new Set(
-  (process.env.ADMIN_EMAILS ?? '').toLowerCase().split(',').map((e) => e.trim()).filter(Boolean),
+  (process.env.ADMIN_EMAILS ?? '')
+    .toLowerCase()
+    .split(',')
+    .map((e) => e.trim())
+    .filter(Boolean),
 );
 
 // Login always runs scrypt, even for an unknown email, so response time does not reveal
@@ -75,12 +84,18 @@ export class AuthService {
     private readonly jwt: JwtService,
   ) {}
 
-  async register(email: string, password: string, displayName: string): Promise<AuthResult> {
+  async register(
+    email: string,
+    password: string,
+    displayName: string,
+  ): Promise<AuthResult> {
     const existing = await this.prisma.user.findUnique({ where: { email } });
     if (existing) throw new ConflictException('Email already registered');
 
     const passwordHash = await hashPassword(password);
-    const user = await this.prisma.user.create({ data: { email, passwordHash, displayName } });
+    const user = await this.prisma.user.create({
+      data: { email, passwordHash, displayName },
+    });
     return this.startSession(user);
   }
 
@@ -104,19 +119,33 @@ export class AuthService {
    * existing account with that email (safe only because sign-in is pinned to the company
    * tenant, see microsoft.ts), else a new passwordless one.
    */
-  async signInWithMicrosoft({ oid, email, name }: MicrosoftIdentity): Promise<AuthResult> {
-    let user = await this.prisma.user.findUnique({ where: { microsoftId: oid } });
+  async signInWithMicrosoft({
+    oid,
+    email,
+    name,
+  }: MicrosoftIdentity): Promise<AuthResult> {
+    let user = await this.prisma.user.findUnique({
+      where: { microsoftId: oid },
+    });
     if (!user) {
       const byEmail = await this.prisma.user.findUnique({ where: { email } });
       // Already tied to a different Microsoft user: never re-point it silently.
-      if (byEmail?.microsoftId) throw new ConflictException('This email is linked to another Microsoft account');
+      if (byEmail?.microsoftId)
+        throw new ConflictException(
+          'This email is linked to another Microsoft account',
+        );
       if (byEmail) {
         // Nobody verified that whoever registered this email owns it: from now on only Microsoft
         // proves that, so the password and every session opened with it go.
-        user = await this.prisma.user.update({ where: { id: byEmail.id }, data: { microsoftId: oid, passwordHash: null } });
+        user = await this.prisma.user.update({
+          where: { id: byEmail.id },
+          data: { microsoftId: oid, passwordHash: null },
+        });
         await this.prisma.session.deleteMany({ where: { userId: user.id } });
       } else {
-        user = await this.prisma.user.create({ data: { email, displayName: name, microsoftId: oid } });
+        user = await this.prisma.user.create({
+          data: { email, displayName: name, microsoftId: oid },
+        });
       }
     }
     return this.startSession(user);
@@ -127,25 +156,59 @@ export class AuthService {
    * must not be enough to lock the owner out. Signs out every other device, keeping the
    * one the change was made from (named by its refresh cookie).
    */
-  async changePassword(userId: string, current: string, next: string, refreshToken?: string): Promise<void> {
+  async changePassword(
+    userId: string,
+    current: string,
+    next: string,
+    refreshToken?: string,
+  ): Promise<void> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new UnauthorizedException('Account no longer exists');
     // 400, not 401: a 401 makes the web client treat it as an expired token and sign out.
-    if (!user.passwordHash) throw new BadRequestException('Esta cuenta inicia sesión con Microsoft');
+    if (!user.passwordHash)
+      throw new BadRequestException('Esta cuenta inicia sesión con Microsoft');
     if (!(await verifyPassword(current, user.passwordHash))) {
       throw new BadRequestException('La contraseña actual no es correcta');
     }
-    if (current === next) throw new BadRequestException('La nueva contraseña debe ser distinta');
+    if (current === next)
+      throw new BadRequestException('La nueva contraseña debe ser distinta');
 
-    await this.prisma.user.update({ where: { id: userId }, data: { passwordHash: await hashPassword(next) } });
-    const keep = refreshToken ? (await this.verifyRefresh(refreshToken).catch(() => null))?.sid : undefined;
-    await this.prisma.session.deleteMany({ where: { userId, ...(keep && { id: { not: keep } }) } });
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash: await hashPassword(next) },
+    });
+    const keep = refreshToken
+      ? (await this.verifyRefresh(refreshToken).catch(() => null))?.sid
+      : undefined;
+    await this.prisma.session.deleteMany({
+      where: { userId, ...(keep && { id: { not: keep } }) },
+    });
   }
 
   async refresh(refreshToken: string): Promise<AuthResult> {
     const payload = await this.verifyRefresh(refreshToken);
+    const session = await this.loadLiveSession(payload);
+    const user = await this.prisma.user.findUnique({
+      where: { id: session.userId },
+    });
+    if (!user || user.disabledAt)
+      throw new UnauthorizedException('Account no longer exists');
 
-    const session = await this.prisma.session.findUnique({ where: { id: payload.sid } });
+    const presented = hashToken(refreshToken);
+    const { token, hash } = await this.signRefresh(user.id, session.id);
+    if (await this.rotateSession(session.id, presented, hash))
+      return this.result(user, token);
+
+    // The winner's Set-Cookie is already on its way to this same browser: hand out an
+    // access token only and leave the cookie alone.
+    await this.assertWithinRotationGrace(session.id, presented);
+    return this.result(user, null);
+  }
+
+  private async loadLiveSession(payload: RefreshPayload) {
+    const session = await this.prisma.session.findUnique({
+      where: { id: payload.sid },
+    });
     if (!session || session.userId !== payload.sub) {
       throw new UnauthorizedException('No active session');
     }
@@ -153,44 +216,60 @@ export class AuthService {
       await this.prisma.session.deleteMany({ where: { id: session.id } });
       throw new UnauthorizedException('Refresh token expired');
     }
-    const user = await this.prisma.user.findUnique({ where: { id: session.userId } });
-    if (!user || user.disabledAt) throw new UnauthorizedException('Account no longer exists');
+    return session;
+  }
 
-    const presented = hashToken(refreshToken);
-    const { token, hash } = await this.signRefresh(user.id, session.id);
-    // Conditional on the hash still being current, so two concurrent refreshes cannot
-    // both rotate: exactly one wins, the other falls through to the grace check.
+  /**
+   * Conditional on the hash still being current, so two concurrent refreshes cannot
+   * both rotate: exactly one wins (true), the other falls through to the grace check.
+   */
+  private async rotateSession(
+    sessionId: string,
+    presented: string,
+    newHash: string,
+  ): Promise<boolean> {
     const rotated = await this.prisma.session.updateMany({
-      where: { id: session.id, tokenHash: presented },
+      where: { id: sessionId, tokenHash: presented },
       data: {
-        tokenHash: hash,
+        tokenHash: newHash,
         prevTokenHash: presented,
         rotatedAt: new Date(),
         // Sliding: a device in use stays signed in; one idle for the TTL does not.
         expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
       },
     });
-    if (rotated.count === 1) return this.result(user, token);
+    return rotated.count === 1;
+  }
 
-    const current = await this.prisma.session.findUnique({ where: { id: session.id } });
+  /** A rotated-out token outside the grace window was replayed: kill this device's session. */
+  private async assertWithinRotationGrace(
+    sessionId: string,
+    presented: string,
+  ): Promise<void> {
+    const current = await this.prisma.session.findUnique({
+      where: { id: sessionId },
+    });
+    const rotatedAt = current?.rotatedAt;
     const graceful =
       current?.prevTokenHash === presented &&
-      current.rotatedAt !== null &&
-      Date.now() - current.rotatedAt.getTime() < ROTATION_GRACE_MS;
-    // The winner's Set-Cookie is already on its way to this same browser: hand out an
-    // access token only and leave the cookie alone.
-    if (graceful) return this.result(user, null);
-
-    // A rotated-out token outside the grace window was replayed: kill this device's session.
-    await this.prisma.session.deleteMany({ where: { id: session.id } });
+      !!rotatedAt &&
+      Date.now() - rotatedAt.getTime() < ROTATION_GRACE_MS;
+    if (graceful) return;
+    await this.prisma.session.deleteMany({ where: { id: sessionId } });
     throw new UnauthorizedException('Invalid refresh token');
   }
 
   /** Signs out the device holding this cookie. Other devices stay signed in. */
-  async logout(userId: string, refreshToken: string | undefined): Promise<void> {
+  async logout(
+    userId: string,
+    refreshToken: string | undefined,
+  ): Promise<void> {
     if (!refreshToken) return;
     const payload = await this.verifyRefresh(refreshToken).catch(() => null);
-    if (payload) await this.prisma.session.deleteMany({ where: { id: payload.sid, userId } });
+    if (payload)
+      await this.prisma.session.deleteMany({
+        where: { id: payload.sid, userId },
+      });
   }
 
   private async verifyRefresh(refreshToken: string): Promise<RefreshPayload> {
@@ -208,13 +287,19 @@ export class AuthService {
   }
 
   private async startSession(user: User): Promise<AuthResult> {
-    if (user.disabledAt) throw new UnauthorizedException('This account is disabled');
+    if (user.disabledAt)
+      throw new UnauthorizedException('This account is disabled');
     // How the first admin comes to exist: nobody is there yet to promote them.
     if (ADMIN_EMAILS.has(user.email) && user.role !== 'ADMIN') {
-      user = await this.prisma.user.update({ where: { id: user.id }, data: { role: 'ADMIN' } });
+      user = await this.prisma.user.update({
+        where: { id: user.id },
+        data: { role: 'ADMIN' },
+      });
     }
     // Housekeeping: a user's dead sessions go whenever they sign in again.
-    await this.prisma.session.deleteMany({ where: { userId: user.id, expiresAt: { lt: new Date() } } });
+    await this.prisma.session.deleteMany({
+      where: { userId: user.id, expiresAt: { lt: new Date() } },
+    });
     const session = await this.prisma.session.create({
       data: {
         userId: user.id,
@@ -223,14 +308,20 @@ export class AuthService {
       },
     });
     const { token, hash } = await this.signRefresh(user.id, session.id);
-    await this.prisma.session.update({ where: { id: session.id }, data: { tokenHash: hash } });
+    await this.prisma.session.update({
+      where: { id: session.id },
+      data: { tokenHash: hash },
+    });
     const oldest = await this.prisma.session.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: 'desc' },
       skip: MAX_SESSIONS_PER_USER,
       select: { id: true },
     });
-    if (oldest.length) await this.prisma.session.deleteMany({ where: { id: { in: oldest.map((s) => s.id) } } });
+    if (oldest.length)
+      await this.prisma.session.deleteMany({
+        where: { id: { in: oldest.map((s) => s.id) } },
+      });
     return this.result(user, token);
   }
 
@@ -243,8 +334,15 @@ export class AuthService {
     return { token, hash: hashToken(token) };
   }
 
-  private async result(user: User, refreshToken: string | null): Promise<AuthResult> {
-    const payload: JwtPayload = { sub: user.id, email: user.email, role: user.role };
+  private async result(
+    user: User,
+    refreshToken: string | null,
+  ): Promise<AuthResult> {
+    const payload: JwtPayload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+    };
     const accessToken = await this.jwt.signAsync(payload, {
       expiresIn: ACCESS_TOKEN_TTL,
       audience: ACCESS_AUDIENCE,
@@ -258,7 +356,10 @@ export class AuthService {
     return this.toAuthUser(user);
   }
 
-  async updateProfile(userId: string, displayName: string | null): Promise<AuthUser> {
+  async updateProfile(
+    userId: string,
+    displayName: string | null,
+  ): Promise<AuthUser> {
     const user = await this.prisma.user.update({
       where: { id: userId },
       data: { displayName },

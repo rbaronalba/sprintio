@@ -10,11 +10,19 @@ export interface Credentials {
 export function parseCredentials(body: unknown): Credentials {
   const { email, password } = (body ?? {}) as Record<string, unknown>;
   // 254 is the longest address SMTP can deliver to.
-  if (typeof email !== 'string' || email.length > 254 || !EMAIL_RE.test(email)) {
+  if (
+    typeof email !== 'string' ||
+    email.length > 254 ||
+    !EMAIL_RE.test(email)
+  ) {
     throw new BadRequestException('Invalid email');
   }
   // The cap keeps a megabyte "password" from buying a free scrypt run.
-  if (typeof password !== 'string' || password.length < 8 || password.length > 128) {
+  if (
+    typeof password !== 'string' ||
+    password.length < 8 ||
+    password.length > 128
+  ) {
     throw new BadRequestException('Password must be 8 to 128 characters');
   }
   return { email: email.toLowerCase(), password };
@@ -25,7 +33,8 @@ export function parseRegisterName(body: unknown): string {
   const { firstName, lastName } = (body ?? {}) as Record<string, unknown>;
   const first = typeof firstName === 'string' ? firstName.trim() : '';
   const last = typeof lastName === 'string' ? lastName.trim() : '';
-  if (!first || !last) throw new BadRequestException('First and last name are required');
+  if (!first || !last)
+    throw new BadRequestException('First and last name are required');
   if (first.length > 30 || last.length > 30) {
     throw new BadRequestException('Name must be at most 30 characters');
   }
@@ -46,14 +55,26 @@ export function parseDisplayName(body: unknown): string | null {
   return trimmed || null;
 }
 
-export function parsePasswordChange(body: unknown): { current: string; next: string } {
-  const { currentPassword, newPassword } = (body ?? {}) as Record<string, unknown>;
+export function parsePasswordChange(body: unknown): {
+  current: string;
+  next: string;
+} {
+  const { currentPassword, newPassword } = (body ?? {}) as Record<
+    string,
+    unknown
+  >;
   if (typeof currentPassword !== 'string' || currentPassword.length > 128) {
     throw new BadRequestException('La contraseña actual es obligatoria');
   }
   // Same rule as registration.
-  if (typeof newPassword !== 'string' || newPassword.length < 8 || newPassword.length > 128) {
-    throw new BadRequestException('La nueva contraseña debe tener entre 8 y 128 caracteres');
+  if (
+    typeof newPassword !== 'string' ||
+    newPassword.length < 8 ||
+    newPassword.length > 128
+  ) {
+    throw new BadRequestException(
+      'La nueva contraseña debe tener entre 8 y 128 caracteres',
+    );
   }
   return { current: currentPassword, next: newPassword };
 }

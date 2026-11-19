@@ -22,7 +22,9 @@ describe('place', () => {
   });
 
   it('still bisects a gap just above the threshold', () => {
-    expect(place([row('a', 1000), row('b', 1000.000002)], 'a')).toEqual({ position: 1000.000001 });
+    expect(place([row('a', 1000), row('b', 1000.000002)], 'a')).toEqual({
+      position: 1000.000001,
+    });
   });
 
   it('renumbers once the gap between the two neighbours is too small to bisect', () => {
@@ -34,6 +36,8 @@ describe('place', () => {
   });
 
   it('renumbers when two items share a position (concurrent drops)', () => {
-    expect(place([row('a', 1500), row('b', 1500)], 'a')?.renumber).toBeDefined();
+    expect(
+      place([row('a', 1500), row('b', 1500)], 'a')?.renumber,
+    ).toBeDefined();
   });
 });

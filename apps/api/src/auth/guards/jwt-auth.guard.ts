@@ -1,6 +1,15 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { ACCESS_AUDIENCE, JWT_ALGORITHM, type JwtPayload } from '../auth.service.js';
+import {
+  ACCESS_AUDIENCE,
+  JWT_ALGORITHM,
+  type JwtPayload,
+} from '../auth.service.js';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -9,7 +18,9 @@ export class JwtAuthGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     const authHeader = request.headers.authorization as string | undefined;
-    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
+    const token = authHeader?.startsWith('Bearer ')
+      ? authHeader.slice(7)
+      : undefined;
     if (!token) throw new UnauthorizedException('Missing access token');
 
     try {

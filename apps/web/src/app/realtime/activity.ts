@@ -18,70 +18,55 @@ const str = (data: Record<string, unknown>, key: string): string => {
   return typeof value === 'string' ? value : '';
 };
 
+type Data = Record<string, unknown>;
+type Describe = (d: Data, card: string, list: string) => string;
+
+const DESCRIPTIONS: Record<string, Describe> = {
+  CARD_CREATED: (_d, card, list) => `añadió ${card} a ${list}`,
+  CARD_MOVED: (d, card) =>
+    `movió ${card} de ${str(d, 'from')} a ${str(d, 'to')}`,
+  CARD_UPDATED: (_d, card) => `actualizó ${card}`,
+  CARD_DELETED: (_d, card) => `eliminó ${card}`,
+  CARD_ASSIGNED: (_d, card) => `te asignó a ${card}`,
+  CARD_UNASSIGNED: (_d, card) => `quitó a un asignado de ${card}`,
+  LABEL_ADDED: (d, card) =>
+    `añadió la etiqueta ${str(d, 'labelName')} a ${card}`,
+  LABEL_REMOVED: (d, card) =>
+    `quitó la etiqueta ${str(d, 'labelName')} de ${card}`,
+  COMMENT_ADDED: (d, card) => `comentó en ${card}: ${str(d, 'excerpt')}`,
+  COMMENT_DELETED: (_d, card) => `eliminó un comentario en ${card}`,
+  ATTACHMENT_ADDED: (d, card) => `adjuntó ${str(d, 'name')} a ${card}`,
+  ATTACHMENT_DELETED: (d, card) => `quitó ${str(d, 'name')} de ${card}`,
+  TIME_LOGGED: (d, card) => `registró ${d['hours']}h en ${card}`,
+  CHECKLIST_ADDED: (_d, card) => `añadió un elemento al checklist de ${card}`,
+  CHECKLIST_TOGGLED: (d, card) =>
+    `${d['done'] ? 'marcó' : 'desmarcó'} un elemento del checklist de ${card}`,
+  CHECKLIST_DELETED: (_d, card) => `quitó un elemento del checklist de ${card}`,
+  LIST_CREATED: (_d, _card, list) => `añadió la lista ${list}`,
+  LIST_UPDATED: (d, _card, list) => `renombró ${str(d, 'from')} a ${list}`,
+  LIST_DELETED: (_d, _card, list) => `eliminó la lista ${list}`,
+  BOARD_RENAMED: (d) =>
+    `renombró el tablero ${str(d, 'from')} a ${str(d, 'boardTitle')}`,
+  OWNER_CHANGED: (d) =>
+    `hizo a ${str(d, 'email')} administrador de ${str(d, 'boardTitle')}`,
+  BOARD_CREATED: (d) => `creó ${str(d, 'boardTitle')}`,
+  MEMBER_JOINED: (d) => `se unió a ${str(d, 'boardTitle')}`,
+  MEMBER_REMOVED: (d) =>
+    d['left']
+      ? `salió de ${str(d, 'boardTitle')}`
+      : `quitó a ${str(d, 'email')} de ${str(d, 'boardTitle')}`,
+};
+
 /**
  * One sentence per event, shared by the activity feed and the notification bell so
  * the same event never reads two different ways.
  */
 export function describeEvent(event: ActivityLike): string {
   const d = event.data ?? {};
-  const card = str(d, 'title');
-  const list = str(d, 'listTitle');
-
-  switch (event.type) {
-    case 'CARD_CREATED':
-      return `añadió ${card} a ${list}`;
-    case 'CARD_MOVED':
-      return `movió ${card} de ${str(d, 'from')} a ${str(d, 'to')}`;
-    case 'CARD_UPDATED':
-      return `actualizó ${card}`;
-    case 'CARD_DELETED':
-      return `eliminó ${card}`;
-    case 'CARD_ASSIGNED':
-      return `te asignó a ${card}`;
-    case 'CARD_UNASSIGNED':
-      return `quitó a un asignado de ${card}`;
-    case 'LABEL_ADDED':
-      return `añadió la etiqueta ${str(d, 'labelName')} a ${card}`;
-    case 'LABEL_REMOVED':
-      return `quitó la etiqueta ${str(d, 'labelName')} de ${card}`;
-    case 'COMMENT_ADDED':
-      return `comentó en ${card}: ${str(d, 'excerpt')}`;
-    case 'COMMENT_DELETED':
-      return `eliminó un comentario en ${card}`;
-    case 'ATTACHMENT_ADDED':
-      return `adjuntó ${str(d, 'name')} a ${card}`;
-    case 'ATTACHMENT_DELETED':
-      return `quitó ${str(d, 'name')} de ${card}`;
-    case 'TIME_LOGGED':
-      return `registró ${d['hours']}h en ${card}`;
-    case 'CHECKLIST_ADDED':
-      return `añadió un elemento al checklist de ${card}`;
-    case 'CHECKLIST_TOGGLED':
-      return `${d['done'] ? 'marcó' : 'desmarcó'} un elemento del checklist de ${card}`;
-    case 'CHECKLIST_DELETED':
-      return `quitó un elemento del checklist de ${card}`;
-    case 'LIST_CREATED':
-      return `añadió la lista ${list}`;
-    case 'LIST_UPDATED':
-      return `renombró ${str(d, 'from')} a ${list}`;
-    case 'LIST_DELETED':
-      return `eliminó la lista ${list}`;
-    case 'BOARD_RENAMED':
-      return `renombró el tablero ${str(d, 'from')} a ${str(d, 'boardTitle')}`;
-    case 'OWNER_CHANGED':
-      return `hizo a ${str(d, 'email')} administrador de ${str(d, 'boardTitle')}`;
-    case 'BOARD_CREATED':
-      return `creó ${str(d, 'boardTitle')}`;
-    case 'MEMBER_JOINED':
-      return `se unió a ${str(d, 'boardTitle')}`;
-    case 'MEMBER_REMOVED':
-      return d['left']
-        ? `salió de ${str(d, 'boardTitle')}`
-        : `quitó a ${str(d, 'email')} de ${str(d, 'boardTitle')}`;
-    default:
-      // A new server event type should read as something, not vanish.
-      return event.type.toLowerCase().replace(/_/g, ' ');
-  }
+  const describe = DESCRIPTIONS[event.type];
+  // A new server event type should read as something, not vanish.
+  if (!describe) return event.type.toLowerCase().replace(/_/g, ' ');
+  return describe(d, str(d, 'title'), str(d, 'listTitle'));
 }
 
 export function relativeTime(iso: string): string {
@@ -102,5 +87,8 @@ export function relativeTime(iso: string): string {
     value /= size;
     unit = next;
   }
-  return new Intl.RelativeTimeFormat('es', { numeric: 'auto' }).format(-Math.round(value), unit);
+  return new Intl.RelativeTimeFormat('es', { numeric: 'auto' }).format(
+    -Math.round(value),
+    unit,
+  );
 }

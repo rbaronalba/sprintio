@@ -7,9 +7,15 @@ import type { NextFunction, Request, Response } from 'express';
  * the live events it causes so that tab can skip its own echoes while the user's other
  * tabs still apply them.
  */
-export const requestContext = new AsyncLocalStorage<{ clientId: string | null }>();
+export const requestContext = new AsyncLocalStorage<{
+  clientId: string | null;
+}>();
 
-export function requestContextMiddleware(req: Request, _res: Response, next: NextFunction): void {
+export function requestContextMiddleware(
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+): void {
   const raw = req.header('x-client-id');
   // Echoed to other subscribers: accept only something shaped like the UUID the web app sends.
   const clientId = raw && /^[0-9a-f-]{36}$/i.test(raw) ? raw : null;

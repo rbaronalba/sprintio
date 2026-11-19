@@ -26,7 +26,8 @@ async function bootstrap() {
       res.setHeader('X-Content-Type-Options', 'nosniff');
       // Only images render in the browser. Everything else (an .xml, a .pdf with script)
       // downloads, so an uploaded file can never run as a page on this origin.
-      if (!IMAGE_EXTENSIONS.has(extname(path).toLowerCase())) res.setHeader('Content-Disposition', 'attachment');
+      if (!IMAGE_EXTENSIONS.has(extname(path).toLowerCase()))
+        res.setHeader('Content-Disposition', 'attachment');
     },
   });
   await app.listen(process.env.PORT ?? 3000);

@@ -1,5 +1,9 @@
 import { TestBed } from '@angular/core/testing';
-import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
+import {
+  HttpClient,
+  provideHttpClient,
+  withInterceptors,
+} from '@angular/common/http';
 import {
   HttpTestingController,
   provideHttpClientTesting,
@@ -31,9 +35,10 @@ describe('authInterceptor', () => {
 
   function login(accessToken: string): void {
     auth.login('dev@sprintio.test', 'password123').subscribe();
-    httpMock
-      .expectOne('/auth/login')
-      .flush({ accessToken, user: { sub: '1', email: 'dev@sprintio.test', role: 'DEVELOPER' } });
+    httpMock.expectOne('/auth/login').flush({
+      accessToken,
+      user: { sub: '1', email: 'dev@sprintio.test', role: 'DEVELOPER' },
+    });
   }
 
   it('attaches the access token to outgoing requests', () => {
@@ -65,7 +70,9 @@ describe('authInterceptor', () => {
     let body: unknown;
     http.get('/boards').subscribe((res) => (body = res));
 
-    httpMock.expectOne('/boards').flush(null, { status: 401, statusText: 'Unauthorized' });
+    httpMock
+      .expectOne('/boards')
+      .flush(null, { status: 401, statusText: 'Unauthorized' });
 
     httpMock.expectOne('/auth/refresh').flush({
       accessToken: 'fresh-token',
@@ -73,7 +80,9 @@ describe('authInterceptor', () => {
     });
 
     const retried = httpMock.expectOne('/boards');
-    expect(retried.request.headers.get('Authorization')).toBe('Bearer fresh-token');
+    expect(retried.request.headers.get('Authorization')).toBe(
+      'Bearer fresh-token',
+    );
     retried.flush([{ id: 'b1' }]);
 
     expect(body).toEqual([{ id: 'b1' }]);
@@ -85,8 +94,12 @@ describe('authInterceptor', () => {
     http.get('/boards').subscribe();
     http.get('/cards').subscribe();
 
-    httpMock.expectOne('/boards').flush(null, { status: 401, statusText: 'Unauthorized' });
-    httpMock.expectOne('/cards').flush(null, { status: 401, statusText: 'Unauthorized' });
+    httpMock
+      .expectOne('/boards')
+      .flush(null, { status: 401, statusText: 'Unauthorized' });
+    httpMock
+      .expectOne('/cards')
+      .flush(null, { status: 401, statusText: 'Unauthorized' });
 
     // A single shared refresh serves both failed requests.
     const refreshCalls = httpMock.match('/auth/refresh');
@@ -105,7 +118,9 @@ describe('authInterceptor', () => {
 
     http.get('/boards').subscribe({ error: () => undefined });
 
-    httpMock.expectOne('/boards').flush(null, { status: 401, statusText: 'Unauthorized' });
+    httpMock
+      .expectOne('/boards')
+      .flush(null, { status: 401, statusText: 'Unauthorized' });
     httpMock
       .expectOne('/auth/refresh')
       .flush(null, { status: 401, statusText: 'Unauthorized' });

@@ -2,15 +2,27 @@ import { describe, expect, it } from 'vitest';
 import { EventsService } from './events.service.js';
 import { extractMentions } from '../cards/dto.js';
 import { mailSubject } from './mail.js';
-import { stubFailingPrisma, stubPrisma, subscribe } from '../../test/support/events.stub.js';
+import {
+  stubFailingPrisma,
+  stubPrisma,
+  subscribe,
+} from '../../test/support/events.stub.js';
 
 describe('EventsService', () => {
   it('never delivers events from a board the subscriber does not belong to', async () => {
     const service = new EventsService(stubPrisma(['mine']) as never);
     const stream = await subscribe(service, 'u1', 1);
 
-    await service.record({ type: 'CARD_CREATED', boardId: 'someone-elses', actorId: 'u9' });
-    await service.record({ type: 'CARD_CREATED', boardId: 'mine', actorId: 'u9' });
+    await service.record({
+      type: 'CARD_CREATED',
+      boardId: 'someone-elses',
+      actorId: 'u9',
+    });
+    await service.record({
+      type: 'CARD_CREATED',
+      boardId: 'mine',
+      actorId: 'u9',
+    });
 
     expect(await stream.received).toMatchObject([{ boardId: 'mine' }]);
   });
@@ -19,20 +31,43 @@ describe('EventsService', () => {
     const service = new EventsService(stubPrisma([]) as never);
     const stream = await subscribe(service, 'u1', 2);
 
-    await service.record({ type: 'MEMBER_JOINED', boardId: 'b2', actorId: 'u1' });
-    await service.record({ type: 'CARD_CREATED', boardId: 'b2', actorId: 'u9' });
+    await service.record({
+      type: 'MEMBER_JOINED',
+      boardId: 'b2',
+      actorId: 'u1',
+    });
+    await service.record({
+      type: 'CARD_CREATED',
+      boardId: 'b2',
+      actorId: 'u9',
+    });
 
-    expect(await stream.received).toMatchObject([{ type: 'MEMBER_JOINED' }, { type: 'CARD_CREATED' }]);
+    expect(await stream.received).toMatchObject([
+      { type: 'MEMBER_JOINED' },
+      { type: 'CARD_CREATED' },
+    ]);
   });
 
   it('does not let someone else joining widen my stream', async () => {
     const service = new EventsService(stubPrisma([]) as never);
     const stream = await subscribe(service, 'u1', 1);
 
-    await service.record({ type: 'MEMBER_JOINED', boardId: 'b2', actorId: 'someone-else' });
-    await service.record({ type: 'CARD_CREATED', boardId: 'b2', actorId: 'someone-else' });
+    await service.record({
+      type: 'MEMBER_JOINED',
+      boardId: 'b2',
+      actorId: 'someone-else',
+    });
+    await service.record({
+      type: 'CARD_CREATED',
+      boardId: 'b2',
+      actorId: 'someone-else',
+    });
     // Only an event on a board u1 actually belongs to should ever arrive.
-    await service.record({ type: 'MEMBER_JOINED', boardId: 'b3', actorId: 'u1' });
+    await service.record({
+      type: 'MEMBER_JOINED',
+      boardId: 'b3',
+      actorId: 'u1',
+    });
 
     expect(await stream.received).toMatchObject([{ boardId: 'b3' }]);
   });
@@ -41,10 +76,28 @@ describe('EventsService', () => {
     const service = new EventsService(stubPrisma([]) as never);
     const stream = await subscribe(service, 'u1', 2);
 
-    await service.record({ type: 'BOARD_CREATED', boardId: 'other', actorId: 'u9', data: { userIds: ['u2'] } });
-    await service.record({ type: 'CARD_CREATED', boardId: 'other', actorId: 'u9' });
-    await service.record({ type: 'BOARD_CREATED', boardId: 'b2', actorId: 'u9', data: { userIds: ['u1', 'u2'] } });
-    await service.record({ type: 'CARD_CREATED', boardId: 'b2', actorId: 'u9' });
+    await service.record({
+      type: 'BOARD_CREATED',
+      boardId: 'other',
+      actorId: 'u9',
+      data: { userIds: ['u2'] },
+    });
+    await service.record({
+      type: 'CARD_CREATED',
+      boardId: 'other',
+      actorId: 'u9',
+    });
+    await service.record({
+      type: 'BOARD_CREATED',
+      boardId: 'b2',
+      actorId: 'u9',
+      data: { userIds: ['u1', 'u2'] },
+    });
+    await service.record({
+      type: 'CARD_CREATED',
+      boardId: 'b2',
+      actorId: 'u9',
+    });
 
     expect(await stream.received).toMatchObject([
       { type: 'BOARD_CREATED', boardId: 'b2' },
@@ -56,9 +109,22 @@ describe('EventsService', () => {
     const service = new EventsService(stubPrisma(['b1', 'b2']) as never);
     const stream = await subscribe(service, 'u1', 2);
 
-    await service.record({ type: 'MEMBER_REMOVED', boardId: 'b1', actorId: 'owner', data: { userId: 'u1' } });
-    await service.record({ type: 'CARD_CREATED', boardId: 'b1', actorId: 'owner' });
-    await service.record({ type: 'CARD_CREATED', boardId: 'b2', actorId: 'owner' });
+    await service.record({
+      type: 'MEMBER_REMOVED',
+      boardId: 'b1',
+      actorId: 'owner',
+      data: { userId: 'u1' },
+    });
+    await service.record({
+      type: 'CARD_CREATED',
+      boardId: 'b1',
+      actorId: 'owner',
+    });
+    await service.record({
+      type: 'CARD_CREATED',
+      boardId: 'b2',
+      actorId: 'owner',
+    });
 
     expect(await stream.received).toMatchObject([
       { type: 'MEMBER_REMOVED', boardId: 'b1' },
@@ -95,20 +161,30 @@ describe('EventsService', () => {
 
 describe('mailSubject', () => {
   it('emails only assignment, removal and moves between lists', () => {
-    expect(mailSubject('CARD_ASSIGNED', 'Ana', { title: 'Fix login' })).toBe('Ana te ha asignado a "Fix login"');
-    expect(mailSubject('CARD_UNASSIGNED', 'Ana', { title: 'Fix login' })).toBe('Ana te ha quitado de "Fix login"');
-    expect(mailSubject('CARD_MOVED', 'Ana', { title: 'Fix login', from: 'Doing', to: 'QA' })).toBe(
-      'Ana ha movido "Fix login" de Doing a QA',
+    expect(mailSubject('CARD_ASSIGNED', 'Ana', { title: 'Fix login' })).toBe(
+      'Ana te ha asignado a "Fix login"',
     );
-    expect(mailSubject('COMMENT_ADDED', 'Ana', { title: 'Fix login' })).toBeNull();
+    expect(mailSubject('CARD_UNASSIGNED', 'Ana', { title: 'Fix login' })).toBe(
+      'Ana te ha quitado de "Fix login"',
+    );
+    expect(
+      mailSubject('CARD_MOVED', 'Ana', {
+        title: 'Fix login',
+        from: 'Doing',
+        to: 'QA',
+      }),
+    ).toBe('Ana ha movido "Fix login" de Doing a QA');
+    expect(
+      mailSubject('COMMENT_ADDED', 'Ana', { title: 'Fix login' }),
+    ).toBeNull();
   });
 });
 
 describe('mentions', () => {
   it('picks out emails, lowercases them and drops duplicates', () => {
-    expect(extractMentions('ping @Dev@sprintio.test and @dev@sprintio.test again')).toEqual([
-      'dev@sprintio.test',
-    ]);
+    expect(
+      extractMentions('ping @Dev@sprintio.test and @dev@sprintio.test again'),
+    ).toEqual(['dev@sprintio.test']);
   });
 
   it('ignores text that is not an email mention', () => {

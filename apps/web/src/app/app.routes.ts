@@ -5,18 +5,23 @@ export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'home' },
   {
     path: 'login',
-    loadComponent: () => import('./auth/login/login.component').then((m) => m.LoginComponent),
+    loadComponent: () =>
+      import('./auth/login/login.component').then((m) => m.LoginComponent),
   },
   {
     path: 'register',
     loadComponent: () =>
-      import('./auth/register/register.component').then((m) => m.RegisterComponent),
+      import('./auth/register/register.component').then(
+        (m) => m.RegisterComponent,
+      ),
   },
   {
     path: 'home',
     canActivate: [authGuard],
     loadComponent: () =>
-      import('./dashboard/dashboard.component').then((m) => m.DashboardComponent),
+      import('./dashboard/dashboard.component').then(
+        (m) => m.DashboardComponent,
+      ),
     data: { view: 'home' },
   },
   {
@@ -24,46 +29,60 @@ export const routes: Routes = [
     pathMatch: 'full',
     canActivate: [authGuard],
     loadComponent: () =>
-      import('./dashboard/dashboard.component').then((m) => m.DashboardComponent),
+      import('./dashboard/dashboard.component').then(
+        (m) => m.DashboardComponent,
+      ),
     data: { view: 'boards' },
   },
   {
     path: 'w/:id',
     canActivate: [authGuard],
     loadComponent: () =>
-      import('./dashboard/dashboard.component').then((m) => m.DashboardComponent),
+      import('./dashboard/dashboard.component').then(
+        (m) => m.DashboardComponent,
+      ),
     data: { view: 'boards' },
   },
   {
     path: 'join/w/:token',
     canActivate: [authGuard],
-    loadComponent: () => import('./boards/join/join.component').then((m) => m.JoinComponent),
+    loadComponent: () =>
+      import('./boards/join/join.component').then((m) => m.JoinComponent),
     data: { kind: 'workspace' },
   },
   {
     path: 'join/:token',
     canActivate: [authGuard],
-    loadComponent: () => import('./boards/join/join.component').then((m) => m.JoinComponent),
+    loadComponent: () =>
+      import('./boards/join/join.component').then((m) => m.JoinComponent),
   },
   {
     path: 'boards/:id',
     canActivate: [authGuard],
     loadComponent: () =>
-      import('./boards/board-detail.component').then((m) => m.BoardDetailComponent),
+      import('./boards/board-detail.component').then(
+        (m) => m.BoardDetailComponent,
+      ),
   },
   {
     path: 'account/password',
     canActivate: [authGuard],
     loadComponent: () =>
-      import('./account/change-password.component').then((m) => m.ChangePasswordComponent),
+      import('./account/change-password.component').then(
+        (m) => m.ChangePasswordComponent,
+      ),
   },
   {
     path: 'admin',
     canActivate: [authGuard],
-    loadComponent: () => import('./admin/admin.component').then((m) => m.AdminComponent),
+    loadComponent: () =>
+      import('./admin/admin.component').then((m) => m.AdminComponent),
   },
   {
     path: '**',
-    loadComponent: () => import('./not-found/not-found.component').then((m) => m.NotFoundComponent),
+    loadComponent: () =>
+      import('./not-found/not-found.component').then(
+        (m) => m.NotFoundComponent,
+      ),
   },
 ];

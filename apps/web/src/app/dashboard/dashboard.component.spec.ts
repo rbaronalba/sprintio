@@ -1,7 +1,10 @@
 import { Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
-import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import {
+  HttpTestingController,
+  provideHttpClientTesting,
+} from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { AuthService } from '../auth/auth.service';
 import { DashboardComponent } from './dashboard.component';
@@ -26,10 +29,17 @@ describe('DashboardComponent', () => {
     });
     httpMock = TestBed.inject(HttpTestingController);
 
-    TestBed.inject(AuthService).login('dev@sprintio.test', 'password123').subscribe();
+    TestBed.inject(AuthService)
+      .login('dev@sprintio.test', 'password123')
+      .subscribe();
     httpMock.expectOne('/auth/login').flush({
       accessToken: 'token-1',
-      user: { sub: '1', email: 'dev@sprintio.test', role: 'DEVELOPER', displayName: null },
+      user: {
+        sub: '1',
+        email: 'dev@sprintio.test',
+        role: 'DEVELOPER',
+        displayName: null,
+      },
     });
 
     fixture = TestBed.createComponent(DashboardComponent);
@@ -44,44 +54,79 @@ describe('DashboardComponent', () => {
     httpMock.expectOne('/boards').flush([]);
     httpMock.expectOne('/workspaces').flush([]);
     fixture.detectChanges();
-    const user: HTMLElement = fixture.nativeElement.querySelector('[data-testid="current-user"]');
+    const user: HTMLElement = fixture.nativeElement.querySelector(
+      '[data-testid="current-user"]',
+    );
     expect(user.textContent).toBe('dev@sprintio.test');
   });
 
-  const board = (id: string, ownerId: string, workspaceId: string, lastViewedAt: string | null = null) =>
-    ({ id, title: `Board ${id}`, ownerId, workspaceId, lastViewedAt });
+  const board = (
+    id: string,
+    ownerId: string,
+    workspaceId: string,
+    lastViewedAt: string | null = null,
+  ) => ({ id, title: `Board ${id}`, ownerId, workspaceId, lastViewedAt });
 
   it('groups boards by workspace and only offers deleting boards the user owns', () => {
     fixture.componentInstance.view.set('boards');
-    httpMock.expectOne('/boards').flush([board('mine', '1', 'w1'), board('shared', '9', 'w2')]);
+    httpMock
+      .expectOne('/boards')
+      .flush([board('mine', '1', 'w1'), board('shared', '9', 'w2')]);
     httpMock.expectOne('/workspaces').flush([
-      { id: 'w1', name: 'Software', ownerId: '1', isMember: true, inviteToken: null },
-      { id: 'w2', name: 'Admin', ownerId: '9', isMember: false, inviteToken: null },
+      {
+        id: 'w1',
+        name: 'Software',
+        ownerId: '1',
+        isMember: true,
+        inviteToken: null,
+      },
+      {
+        id: 'w2',
+        name: 'Admin',
+        ownerId: '9',
+        isMember: false,
+        inviteToken: null,
+      },
     ]);
     fixture.detectChanges();
 
-    const groups: NodeListOf<HTMLElement> = fixture.nativeElement.querySelectorAll('section.group');
+    const groups: NodeListOf<HTMLElement> =
+      fixture.nativeElement.querySelectorAll('section.group');
     const software = groups[0];
     const admin = groups[1];
     expect(groups.length).toBe(2);
     expect(software.getAttribute('aria-label')).toBe('Software');
     expect(admin.getAttribute('aria-label')).toBe('Admin');
-    expect(software.querySelector('button[aria-label="Eliminar tablero"]')).not.toBeNull();
-    expect(admin.querySelector('button[aria-label="Eliminar tablero"]')).toBeNull();
+    expect(
+      software.querySelector('button[aria-label="Eliminar tablero"]'),
+    ).not.toBeNull();
+    expect(
+      admin.querySelector('button[aria-label="Eliminar tablero"]'),
+    ).toBeNull();
     // Only workspace members add boards; w2 is only visible through a directly shared board.
     expect(software.querySelector('.board-tile--new')).not.toBeNull();
     expect(admin.querySelector('.board-tile--new')).toBeNull();
   });
 
   it('lists the three most recently viewed boards, newest first', () => {
-    httpMock.expectOne('/boards').flush([
-      board('a', '1', 'w1', '2026-09-01T00:00:00Z'),
-      board('b', '1', 'w1', '2026-09-04T00:00:00Z'),
-      board('never', '1', 'w1'),
-      board('c', '1', 'w1', '2026-09-03T00:00:00Z'),
-      board('d', '1', 'w1', '2026-09-02T00:00:00Z'),
+    httpMock
+      .expectOne('/boards')
+      .flush([
+        board('a', '1', 'w1', '2026-09-01T00:00:00Z'),
+        board('b', '1', 'w1', '2026-09-04T00:00:00Z'),
+        board('never', '1', 'w1'),
+        board('c', '1', 'w1', '2026-09-03T00:00:00Z'),
+        board('d', '1', 'w1', '2026-09-02T00:00:00Z'),
+      ]);
+    httpMock.expectOne('/workspaces').flush([
+      {
+        id: 'w1',
+        name: 'Software',
+        ownerId: '1',
+        isMember: true,
+        inviteToken: null,
+      },
     ]);
-    httpMock.expectOne('/workspaces').flush([{ id: 'w1', name: 'Software', ownerId: '1', isMember: true, inviteToken: null }]);
     expect(idsOf(fixture.componentInstance.recent())).toEqual(['b', 'c', 'd']);
   });
 
@@ -90,9 +135,18 @@ describe('DashboardComponent', () => {
       { ...board('fav', '1', 'w1'), starred: true },
       { ...board('plain', '1', 'w1'), starred: false },
     ]);
-    httpMock.expectOne('/workspaces').flush([{ id: 'w1', name: 'Software', ownerId: '1', isMember: true, inviteToken: null }]);
+    httpMock.expectOne('/workspaces').flush([
+      {
+        id: 'w1',
+        name: 'Software',
+        ownerId: '1',
+        isMember: true,
+        inviteToken: null,
+      },
+    ]);
     fixture.detectChanges();
-    const starred: HTMLElement = fixture.nativeElement.querySelector('section.starred');
+    const starred: HTMLElement =
+      fixture.nativeElement.querySelector('section.starred');
     expect(starred.textContent).toContain('Board fav');
     expect(starred.textContent).not.toContain('Board plain');
   });

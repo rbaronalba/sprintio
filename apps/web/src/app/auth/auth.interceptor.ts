@@ -1,5 +1,9 @@
 import { inject } from '@angular/core';
-import { HttpErrorResponse, HttpInterceptorFn, HttpRequest } from '@angular/common/http';
+import {
+  HttpErrorResponse,
+  HttpInterceptorFn,
+  HttpRequest,
+} from '@angular/common/http';
 import { Router } from '@angular/router';
 import { catchError, switchMap, throwError } from 'rxjs';
 import { AuthService } from './auth.service';
@@ -7,9 +11,17 @@ import { CLIENT_ID } from '../realtime/realtime.service';
 
 const AUTH_ENDPOINTS = ['/auth/login', '/auth/register', '/auth/refresh'];
 
-function withToken(req: HttpRequest<unknown>, token: string | null): HttpRequest<unknown> {
+function withToken(
+  req: HttpRequest<unknown>,
+  token: string | null,
+): HttpRequest<unknown> {
   // X-Client-Id comes back on the live events this request causes; see CLIENT_ID.
-  return req.clone({ setHeaders: { 'X-Client-Id': CLIENT_ID, ...(token && { Authorization: `Bearer ${token}` }) } });
+  return req.clone({
+    setHeaders: {
+      'X-Client-Id': CLIENT_ID,
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
+  });
 }
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {

@@ -16,7 +16,12 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
 import { BoardsService } from './boards.service.js';
-import { parseBackground, parseCreateBoard, parseTitle, parseUpsertLabel } from './dto.js';
+import {
+  parseBackground,
+  parseCreateBoard,
+  parseTitle,
+  parseUpsertLabel,
+} from './dto.js';
 import { attachmentUploadOptions } from '../cards/uploads.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
@@ -34,7 +39,10 @@ export class BoardsController {
 
   @Throttle({ default: { ttl: 60_000, limit: 20 } })
   @Get('join/:token')
-  previewInvite(@CurrentUser() user: JwtPayload, @Param('token') token: string) {
+  previewInvite(
+    @CurrentUser() user: JwtPayload,
+    @Param('token') token: string,
+  ) {
     return this.boards.previewInvite(user.sub, token);
   }
 
@@ -50,9 +58,14 @@ export class BoardsController {
   }
 
   @Put(':id/star')
-  setStarred(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() body: unknown) {
+  setStarred(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
     const { starred } = (body ?? {}) as Record<string, unknown>;
-    if (typeof starred !== 'boolean') throw new BadRequestException('starred must be a boolean');
+    if (typeof starred !== 'boolean')
+      throw new BadRequestException('starred must be a boolean');
     return this.boards.setStarred(user.sub, id, starred);
   }
 
@@ -65,7 +78,11 @@ export class BoardsController {
     @Body() body: unknown,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    return this.boards.setBackground(user.sub, id, file ? `/uploads/${file.filename}` : parseBackground(body));
+    return this.boards.setBackground(
+      user.sub,
+      id,
+      file ? `/uploads/${file.filename}` : parseBackground(body),
+    );
   }
 
   @Post(':id/invite')
@@ -89,7 +106,11 @@ export class BoardsController {
   }
 
   @Put(':id/owner/:userId')
-  transfer(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Param('userId') userId: string) {
+  transfer(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+  ) {
     return this.boards.transfer(user.sub, id, userId);
   }
 
@@ -109,7 +130,11 @@ export class BoardsController {
   }
 
   @Post(':id/labels')
-  createLabel(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() body: unknown) {
+  createLabel(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
     return this.boards.createLabel(user.sub, id, parseUpsertLabel(body));
   }
 
@@ -129,7 +154,11 @@ export class BoardsController {
   }
 
   @Patch(':id')
-  update(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() body: unknown) {
+  update(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
     return this.boards.update(user.sub, id, parseTitle(body));
   }
 
@@ -150,4 +179,3 @@ export class SearchController {
     return this.boards.search(user.sub, q ?? '');
   }
 }
-

@@ -1,4 +1,13 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { WorkspacesService } from './workspaces.service.js';
 import { parseWorkspaceName } from './dto.js';
@@ -24,7 +33,10 @@ export class WorkspacesController {
   // Throttled like the board invite endpoints: a token is a capability, don't let it be guessed.
   @Throttle({ default: { ttl: 60_000, limit: 20 } })
   @Get('join/:token')
-  previewInvite(@CurrentUser() user: JwtPayload, @Param('token') token: string) {
+  previewInvite(
+    @CurrentUser() user: JwtPayload,
+    @Param('token') token: string,
+  ) {
     return this.workspaces.previewInvite(user.sub, token);
   }
 
@@ -35,7 +47,11 @@ export class WorkspacesController {
   }
 
   @Patch(':id')
-  rename(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() body: unknown) {
+  rename(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
     return this.workspaces.rename(user.sub, id, parseWorkspaceName(body));
   }
 
@@ -61,7 +77,11 @@ export class WorkspacesController {
 
   // Owner: remove a member. Anyone: pass their own id to leave.
   @Delete(':id/members/:userId')
-  removeMember(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Param('userId') userId: string) {
+  removeMember(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+  ) {
     return this.workspaces.removeMember(user.sub, id, userId);
   }
 }

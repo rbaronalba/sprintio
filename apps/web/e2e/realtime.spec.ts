@@ -1,5 +1,14 @@
 import { expect, test } from '@playwright/test';
-import { addCard, addList, createBoard, dragCardTo, inviteSecondUser, listColumn, register, uniqueEmail } from './helpers';
+import {
+  addCard,
+  addList,
+  createBoard,
+  dragCardTo,
+  inviteSecondUser,
+  listColumn,
+  register,
+  uniqueEmail,
+} from './helpers';
 
 test.describe('live collaboration', () => {
   test('a card moved by one member appears moved for the other without a reload', async ({
@@ -12,14 +21,24 @@ test.describe('live collaboration', () => {
     await addList(owner, 'Track');
     await addCard(owner, 'Pit wall', 'Radio check');
 
-    const { guest, guestContext } = await inviteSecondUser(owner, browser, uniqueEmail('guest'));
-    await expect(listColumn(guest, 'Pit wall').getByText('Radio check')).toBeVisible();
+    const { guest, guestContext } = await inviteSecondUser(
+      owner,
+      browser,
+      uniqueEmail('guest'),
+    );
+    await expect(
+      listColumn(guest, 'Pit wall').getByText('Radio check'),
+    ).toBeVisible();
 
     await dragCardTo(owner, 'Radio check', 'Track');
 
     // No reload on the guest page: this only passes if the SSE stream delivered it.
-    await expect(listColumn(guest, 'Track').getByText('Radio check')).toBeVisible({ timeout: 10_000 });
-    await expect(listColumn(guest, 'Pit wall').getByText('Radio check')).toHaveCount(0);
+    await expect(
+      listColumn(guest, 'Track').getByText('Radio check'),
+    ).toBeVisible({ timeout: 10_000 });
+    await expect(
+      listColumn(guest, 'Pit wall').getByText('Radio check'),
+    ).toHaveCount(0);
 
     await guestContext.close();
   });
@@ -34,7 +53,11 @@ test.describe('live collaboration', () => {
     await addList(owner, 'Setup');
     await addCard(owner, 'Setup', 'Fit the wet tyres');
 
-    const { guest, guestContext } = await inviteSecondUser(owner, browser, guestEmail);
+    const { guest, guestContext } = await inviteSecondUser(
+      owner,
+      browser,
+      guestEmail,
+    );
 
     await owner.reload(); // pick up the new member in the assignee popover
     await listColumn(owner, 'Setup')
@@ -50,49 +73,78 @@ test.describe('live collaboration', () => {
     await bell.click();
     await guest.getByText(/te asignó a Fit the wet tyres/i).click();
     // Following the notification lands on the board with that card's modal already open.
-    await expect(guest.locator('.card-title-display')).toHaveText('Fit the wet tyres');
+    await expect(guest.locator('.card-title-display')).toHaveText(
+      'Fit the wet tyres',
+    );
 
     await guestContext.close();
   });
 
-  test('a mention in a comment notifies the mentioned member', async ({ page: owner, browser }) => {
+  test('a mention in a comment notifies the mentioned member', async ({
+    page: owner,
+    browser,
+  }) => {
     const guestEmail = uniqueEmail('mentioned');
     await register(owner, uniqueEmail('mentioner'));
     await createBoard(owner, 'Monaco');
     await addList(owner, 'Strategy');
     await addCard(owner, 'Strategy', 'Undercut on lap 20');
 
-    const { guest, guestContext } = await inviteSecondUser(owner, browser, guestEmail);
+    const { guest, guestContext } = await inviteSecondUser(
+      owner,
+      browser,
+      guestEmail,
+    );
 
     await listColumn(owner, 'Strategy').getByText('Undercut on lap 20').click();
     await owner.getByText('Escribe tu comentario aquí').click();
-    await owner.locator('.new-comment [contenteditable]').fill(`@${guestEmail} thoughts?`);
+    await owner
+      .locator('.new-comment [contenteditable]')
+      .fill(`@${guestEmail} thoughts?`);
     await owner.getByRole('button', { name: 'Comentar' }).click();
 
-    await expect(guest.getByRole('button', { name: /actividad/i })).toContainText('(1)', {
+    await expect(
+      guest.getByRole('button', { name: /actividad/i }),
+    ).toContainText('(1)', {
       timeout: 10_000,
     });
 
     await guestContext.close();
   });
 
-  test('reordering within one list reaches the other member', async ({ page: owner, browser }) => {
+  test('reordering within one list reaches the other member', async ({
+    page: owner,
+    browser,
+  }) => {
     await register(owner, uniqueEmail('reorder'));
     await createBoard(owner, 'Suzuka');
     await addList(owner, 'Grid');
     await addCard(owner, 'Grid', 'First');
     await addCard(owner, 'Grid', 'Second');
-    const { guest, guestContext } = await inviteSecondUser(owner, browser, uniqueEmail('reorder-guest'));
-    await expect(listColumn(guest, 'Grid').locator('.card').first()).toContainText('First');
+    const { guest, guestContext } = await inviteSecondUser(
+      owner,
+      browser,
+      uniqueEmail('reorder-guest'),
+    );
+    await expect(
+      listColumn(guest, 'Grid').locator('.card').first(),
+    ).toContainText('First');
 
     await dragCardTo(owner, 'Second', 'Grid');
-    await expect(listColumn(owner, 'Grid').locator('.card').first()).toContainText('Second');
-    await expect(listColumn(guest, 'Grid').locator('.card').first()).toContainText('Second', { timeout: 10_000 });
+    await expect(
+      listColumn(owner, 'Grid').locator('.card').first(),
+    ).toContainText('Second');
+    await expect(
+      listColumn(guest, 'Grid').locator('.card').first(),
+    ).toContainText('Second', { timeout: 10_000 });
 
     await guestContext.close();
   });
 
-  test("a user's other tab picks up their own changes", async ({ page: tab1, context }) => {
+  test("a user's other tab picks up their own changes", async ({
+    page: tab1,
+    context,
+  }) => {
     await register(tab1, uniqueEmail('two-tabs'));
     await createBoard(tab1, 'Spa');
     await addList(tab1, 'Sector 1');
@@ -101,6 +153,8 @@ test.describe('live collaboration', () => {
     await expect(tab2.getByRole('heading', { name: 'Sector 1' })).toBeVisible();
 
     await addCard(tab1, 'Sector 1', 'Eau Rouge');
-    await expect(listColumn(tab2, 'Sector 1').getByText('Eau Rouge')).toBeVisible({ timeout: 10_000 });
+    await expect(
+      listColumn(tab2, 'Sector 1').getByText('Eau Rouge'),
+    ).toBeVisible({ timeout: 10_000 });
   });
 });

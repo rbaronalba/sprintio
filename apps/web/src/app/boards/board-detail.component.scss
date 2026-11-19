@@ -474,7 +474,9 @@ main {
   border: 1px dashed var(--hairline);
   background: var(--canvas-elevated);
   color: var(--ink);
-  transition: border-color 120ms linear, color 120ms linear;
+  transition:
+    border-color 120ms linear,
+    color 120ms linear;
 }
 
 .add-list:hover {
@@ -618,13 +620,15 @@ main {
   background: rgba(0, 0, 0, 0.6);
 }
 
-.card-dialog label {
+.card-dialog label,
+.card-dialog .label-caps {
   display: block;
   margin: var(--space-xs) 0 var(--space-xxs);
   color: var(--body);
 }
 
-.card-dialog label:first-child {
+.card-dialog label:first-child,
+.card-dialog .label-caps:first-child {
   margin-top: 0;
 }
 
@@ -974,7 +978,7 @@ main {
   margin-bottom: var(--space-xxs);
 }
 
-.side-head label {
+.side-head .label-caps {
   margin: 0;
 }
 
@@ -1115,7 +1119,6 @@ main {
   height: 32px;
   padding: 5px var(--space-xs);
 }
-
 
 .time-list,
 .attachment-list {
