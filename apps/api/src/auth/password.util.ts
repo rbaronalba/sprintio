@@ -1,14 +1,28 @@
-import { randomBytes, scrypt, timingSafeEqual, type ScryptOptions } from 'node:crypto';
+import {
+  randomBytes,
+  scrypt,
+  timingSafeEqual,
+  type ScryptOptions,
+} from 'node:crypto';
 
 // OWASP's scrypt floor: N=2^17, r=8, p=1. That costs 128 MiB per hash (128·N·r), above
 // Node's 32 MiB default maxmem, hence the explicit ceiling.
 const PARAMS = { N: 2 ** 17, r: 8, p: 1 };
 const KEY_LEN = 64;
 
-function derive(password: string, salt: string, params: { N: number; r: number; p: number }) {
-  const options: ScryptOptions = { ...params, maxmem: 256 * params.N * params.r };
+function derive(
+  password: string,
+  salt: string,
+  params: { N: number; r: number; p: number },
+) {
+  const options: ScryptOptions = {
+    ...params,
+    maxmem: 256 * params.N * params.r,
+  };
   return new Promise<Buffer>((resolve, reject) =>
-    scrypt(password, salt, KEY_LEN, options, (err, key) => (err ? reject(err) : resolve(key))),
+    scrypt(password, salt, KEY_LEN, options, (err, key) =>
+      err ? reject(err) : resolve(key),
+    ),
   );
 }
 
@@ -30,7 +44,10 @@ function parse(stored: string) {
   return { params: { N: 16384, r: 8, p: 1 }, salt, hash };
 }
 
-export async function verifyPassword(password: string, stored: string): Promise<boolean> {
+export async function verifyPassword(
+  password: string,
+  stored: string,
+): Promise<boolean> {
   const { params, salt, hash } = parse(stored);
   if (!salt || !hash) return false;
   const key = await derive(password, salt, params);
@@ -41,5 +58,7 @@ export async function verifyPassword(password: string, stored: string): Promise<
 /** True when the stored hash was made with weaker parameters than we use today. */
 export function needsRehash(stored: string): boolean {
   const { params } = parse(stored);
-  return params.N !== PARAMS.N || params.r !== PARAMS.r || params.p !== PARAMS.p;
+  return (
+    params.N !== PARAMS.N || params.r !== PARAMS.r || params.p !== PARAMS.p
+  );
 }

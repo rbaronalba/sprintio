@@ -1,5 +1,4 @@
 <div class="auth-split">
-
   <section class="cinema">
     <p class="cinema-mark">Sprintio</p>
     <div>
@@ -12,7 +11,12 @@
 
     <form [formGroup]="form" (ngSubmit)="submit()">
       <label for="email" class="label-caps">Correo electrónico</label>
-      <input id="email" type="email" formControlName="email" autocomplete="email" />
+      <input
+        id="email"
+        type="email"
+        formControlName="email"
+        autocomplete="email"
+      />
 
       <label for="password" class="label-caps">Contraseña</label>
       <input
@@ -26,7 +30,11 @@
         <p class="error" role="alert">{{ error() }}</p>
       }
 
-      <button type="submit" class="btn btn-primary" [disabled]="form.invalid || pending()">
+      <button
+        type="submit"
+        class="btn btn-primary"
+        [disabled]="form.invalid || pending()"
+      >
         {{ pending() ? 'Iniciando sesión…' : 'Iniciar sesión' }}
       </button>
     </form>
@@ -48,7 +56,10 @@
     }
 
     @if (!microsoft()) {
-      <p class="switch">¿No tienes cuenta? <a routerLink="/register" queryParamsHandling="preserve">Créala</a></p>
+      <p class="switch">
+        ¿No tienes cuenta?
+        <a routerLink="/register" queryParamsHandling="preserve">Créala</a>
+      </p>
     }
   </main>
 </div>

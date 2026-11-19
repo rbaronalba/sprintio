@@ -1,5 +1,10 @@
 import { randomBytes } from 'node:crypto';
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { MAX_MEMBERS_PER_BOARD, memberOf } from './access.js';
 import { EventsService } from '../events/events.service.js';
@@ -25,7 +30,12 @@ export class BoardsService {
       where: memberOf(userId),
       orderBy: { createdAt: 'desc' },
       omit: { inviteToken: true },
-      include: { members: { where: { userId }, select: { starred: true, lastViewedAt: true } } },
+      include: {
+        members: {
+          where: { userId },
+          select: { starred: true, lastViewedAt: true },
+        },
+      },
     });
     return boards.map(({ members: [me], ...board }) => ({ ...board, ...me }));
   }
@@ -34,16 +44,32 @@ export class BoardsService {
    * The board lands in a workspace the creator belongs to (their oldest owned one when none
    * is named, created on first use), and every member of that workspace joins it.
    */
+  private async workspaceForNewBoard(ownerId: string, workspaceId?: string) {
+    return workspaceId
+      ? await this.prisma.workspace.findFirst({
+          where: { id: workspaceId, members: { some: { userId: ownerId } } },
+        })
+      : ((await this.prisma.workspace.findFirst({
+          where: { ownerId },
+          orderBy: { createdAt: 'asc' },
+        })) ??
+          (await this.prisma.workspace.create({
+            data: {
+              name: 'Mi espacio de trabajo',
+              ownerId,
+              members: { create: { userId: ownerId } },
+            },
+          })));
+  }
+
   async create(ownerId: string, title: string, workspaceId?: string) {
-    if ((await this.prisma.board.count({ where: { ownerId } })) >= MAX_BOARDS_PER_USER) {
+    if (
+      (await this.prisma.board.count({ where: { ownerId } })) >=
+      MAX_BOARDS_PER_USER
+    ) {
       throw new BadRequestException('Board limit reached');
     }
-    const ws = workspaceId
-      ? await this.prisma.workspace.findFirst({ where: { id: workspaceId, members: { some: { userId: ownerId } } } })
-      : ((await this.prisma.workspace.findFirst({ where: { ownerId }, orderBy: { createdAt: 'asc' } })) ??
-        (await this.prisma.workspace.create({
-          data: { name: 'Mi espacio de trabajo', ownerId, members: { create: { userId: ownerId } } },
-        })));
+    const ws = await this.workspaceForNewBoard(ownerId, workspaceId);
     if (!ws) throw new NotFoundException('Workspace not found');
 
     const others = await this.prisma.workspaceMember.findMany({
@@ -55,7 +81,9 @@ export class BoardsService {
         title,
         ownerId,
         workspaceId: ws.id,
-        members: { create: [{ userId: ownerId, lastViewedAt: new Date() }, ...others] },
+        members: {
+          create: [{ userId: ownerId, lastViewedAt: new Date() }, ...others],
+        },
       },
       omit: { inviteToken: true },
     });
@@ -121,23 +149,39 @@ export class BoardsService {
 
   async update(ownerId: string, id: string, title: string) {
     const board = await this.findOwned(ownerId, id);
-    const updated = await this.prisma.board.update({ where: { id }, data: { title }, omit: { inviteToken: true } });
+    const updated = await this.prisma.board.update({
+      where: { id },
+      data: { title },
+      omit: { inviteToken: true },
+    });
     if (title !== board.title) {
-      await this.events.record({ type: 'BOARD_RENAMED', boardId: id, actorId: ownerId, data: { from: board.title, boardTitle: title } });
+      await this.events.record({
+        type: 'BOARD_RENAMED',
+        boardId: id,
+        actorId: ownerId,
+        data: { from: board.title, boardTitle: title },
+      });
     }
     return updated;
   }
 
   /** Any member, like Trello. A just-uploaded image is deleted again if access fails. */
   async setBackground(userId: string, id: string, background: string) {
-    const board = await this.prisma.board.findFirst({ where: { id, ...memberOf(userId) } });
+    const board = await this.prisma.board.findFirst({
+      where: { id, ...memberOf(userId) },
+    });
     if (!board) {
       await removeUpload(background);
       throw new NotFoundException('Board not found');
     }
     await this.prisma.board.update({ where: { id }, data: { background } });
     await removeUpload(board.background);
-    await this.events.record({ type: 'BACKGROUND_CHANGED', boardId: id, actorId: userId, data: { title: board.title } });
+    await this.events.record({
+      type: 'BACKGROUND_CHANGED',
+      boardId: id,
+      actorId: userId,
+      data: { title: board.title },
+    });
     return { background };
   }
 
@@ -148,8 +192,12 @@ export class BoardsService {
       where: { boardId_userId: { boardId: id, userId: targetId } },
       include: { user: { select: { email: true } } },
     });
-    if (!member) throw new BadRequestException('User is not a member of this board');
-    await this.prisma.board.update({ where: { id }, data: { ownerId: targetId } });
+    if (!member)
+      throw new BadRequestException('User is not a member of this board');
+    await this.prisma.board.update({
+      where: { id },
+      data: { ownerId: targetId },
+    });
     await this.events.record({
       type: 'OWNER_CHANGED',
       boardId: id,
@@ -179,13 +227,19 @@ export class BoardsService {
     if (board.inviteToken) return { token: board.inviteToken };
     // 192 bits: an unguessable capability, so knowing the link is what grants the right to join.
     const token = randomBytes(24).toString('hex');
-    await this.prisma.board.update({ where: { id }, data: { inviteToken: token } });
+    await this.prisma.board.update({
+      where: { id },
+      data: { inviteToken: token },
+    });
     return { token };
   }
 
   async revokeInvite(ownerId: string, id: string) {
     await this.findOwned(ownerId, id);
-    await this.prisma.board.update({ where: { id }, data: { inviteToken: null } });
+    await this.prisma.board.update({
+      where: { id },
+      data: { inviteToken: null },
+    });
   }
 
   /**
@@ -193,16 +247,26 @@ export class BoardsService {
    * Their card assignments go with them, so no card shows an assignee who cannot see it.
    */
   async removeMember(actorId: string, boardId: string, targetId: string) {
-    const board = await this.prisma.board.findFirst({ where: { id: boardId, ...memberOf(actorId) } });
+    const board = await this.prisma.board.findFirst({
+      where: { id: boardId, ...memberOf(actorId) },
+    });
     if (!board) throw new NotFoundException('Board not found');
-    if (targetId === board.ownerId) throw new BadRequestException('The owner cannot leave their board');
+    if (targetId === board.ownerId)
+      throw new BadRequestException('The owner cannot leave their board');
     if (actorId !== board.ownerId && actorId !== targetId) {
       throw new ForbiddenException('Only the owner can remove other members');
     }
-    const target = await this.prisma.user.findUnique({ where: { id: targetId }, select: { email: true } });
+    const target = await this.prisma.user.findUnique({
+      where: { id: targetId },
+      select: { email: true },
+    });
     const [, removed] = await this.prisma.$transaction([
-      this.prisma.cardMember.deleteMany({ where: { userId: targetId, card: { list: { boardId } } } }),
-      this.prisma.boardMember.deleteMany({ where: { boardId, userId: targetId } }),
+      this.prisma.cardMember.deleteMany({
+        where: { userId: targetId, card: { list: { boardId } } },
+      }),
+      this.prisma.boardMember.deleteMany({
+        where: { boardId, userId: targetId },
+      }),
     ]);
     if (removed.count === 0) return;
     // EventsService narrows the target's open stream on exactly this event.
@@ -210,23 +274,36 @@ export class BoardsService {
       type: 'MEMBER_REMOVED',
       boardId,
       actorId,
-      data: { boardTitle: board.title, userId: targetId, email: target?.email, left: actorId === targetId },
+      data: {
+        boardTitle: board.title,
+        userId: targetId,
+        email: target?.email,
+        left: actorId === targetId,
+      },
     });
   }
 
   private async assertMember(userId: string, boardId: string) {
-    const board = await this.prisma.board.findFirst({ where: { id: boardId, ...memberOf(userId) } });
+    const board = await this.prisma.board.findFirst({
+      where: { id: boardId, ...memberOf(userId) },
+    });
     if (!board) throw new NotFoundException('Board not found');
   }
 
   async listLabels(userId: string, boardId: string) {
     await this.assertMember(userId, boardId);
-    return this.prisma.label.findMany({ where: { boardId }, orderBy: { name: 'asc' } });
+    return this.prisma.label.findMany({
+      where: { boardId },
+      orderBy: { name: 'asc' },
+    });
   }
 
   async createLabel(userId: string, boardId: string, input: UpsertLabelInput) {
     await this.assertMember(userId, boardId);
-    if ((await this.prisma.label.count({ where: { boardId } })) >= MAX_LABELS_PER_BOARD) {
+    if (
+      (await this.prisma.label.count({ where: { boardId } })) >=
+      MAX_LABELS_PER_BOARD
+    ) {
       throw new BadRequestException('Label limit reached');
     }
     return this.prisma.label.create({ data: { ...input, boardId } });
@@ -238,8 +315,11 @@ export class BoardsService {
   }
 
   private async byToken(token: string) {
-    const board = await this.prisma.board.findUnique({ where: { inviteToken: token } });
-    if (!board) throw new NotFoundException('Invitation not found or no longer valid');
+    const board = await this.prisma.board.findUnique({
+      where: { inviteToken: token },
+    });
+    if (!board)
+      throw new NotFoundException('Invitation not found or no longer valid');
     return board;
   }
 
@@ -255,10 +335,16 @@ export class BoardsService {
     const board = await this.byToken(token);
     const key = { boardId_userId: { boardId: board.id, userId } };
     if (!(await this.prisma.boardMember.findUnique({ where: key }))) {
-      if ((await this.prisma.boardMember.count({ where: { boardId: board.id } })) >= MAX_MEMBERS_PER_BOARD) {
+      if (
+        (await this.prisma.boardMember.count({
+          where: { boardId: board.id },
+        })) >= MAX_MEMBERS_PER_BOARD
+      ) {
         throw new BadRequestException('This board is full');
       }
-      await this.prisma.boardMember.create({ data: { boardId: board.id, userId } });
+      await this.prisma.boardMember.create({
+        data: { boardId: board.id, userId },
+      });
       // The actor is the joiner: EventsService uses exactly this to widen an open
       // stream's board set without re-querying membership on every message.
       await this.events.record({
@@ -303,7 +389,13 @@ export class BoardsService {
       select: {
         id: true,
         title: true,
-        list: { select: { id: true, title: true, board: { select: { id: true, title: true } } } },
+        list: {
+          select: {
+            id: true,
+            title: true,
+            board: { select: { id: true, title: true } },
+          },
+        },
       },
     });
     return cards.map((card) => ({

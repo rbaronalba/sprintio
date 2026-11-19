@@ -15,8 +15,13 @@ describe('card limits', () => {
       list: { findFirst: async () => ({ id: 'l1' }) },
       card: { count: async () => 200 },
     };
-    const cards = new CardsService(prisma as never, { record: async () => {} } as never);
-    await expect(cards.create('u1', 'l1', 'x')).rejects.toThrow('Card limit reached');
+    const cards = new CardsService(
+      prisma as never,
+      { record: async () => {} } as never,
+    );
+    await expect(cards.create('u1', 'l1', 'x')).rejects.toThrow(
+      'Card limit reached',
+    );
   });
 
   it('clears the completion flag when the due date is cleared, whatever the body says', () => {

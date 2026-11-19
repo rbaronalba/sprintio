@@ -33,9 +33,15 @@
           } @else if (hits().length) {
             <p class="drop-title">Tarjetas</p>
             @for (h of hits(); track h.cardId) {
-              <button type="button" class="row" (click)="openBoard(h.boardId, h.cardId)">
+              <button
+                type="button"
+                class="row"
+                (click)="openBoard(h.boardId, h.cardId)"
+              >
                 <span class="row-title">{{ h.title }}</span>
-                <span class="row-where">{{ h.boardTitle }}: {{ h.listTitle }}</span>
+                <span class="row-where"
+                  >{{ h.boardTitle }}: {{ h.listTitle }}</span
+                >
               </button>
             }
           } @else {
@@ -48,7 +54,9 @@
         </div>
       }
     </div>
-    <button type="button" class="create" (click)="openCreate()">Crear tablero</button>
+    <button type="button" class="create" (click)="openCreate()">
+      Crear tablero
+    </button>
   </div>
 
   <div class="right">
@@ -65,15 +73,24 @@
           {{ initials(user.displayName, user.email) }}
         </button>
         @if (menuOpen()) {
-          <div class="dropdown account-menu" (mousedown)="$event.preventDefault()">
+          <div
+            class="dropdown account-menu"
+            (mousedown)="$event.preventDefault()"
+          >
             <p class="drop-title">Cuenta</p>
             <p class="acc-name">{{ user.displayName || user.email }}</p>
             <p class="acc-email">{{ user.email }}</p>
-            <button type="button" class="row" (click)="openProfile()"><span class="row-title">Perfil</span></button>
+            <button type="button" class="row" (click)="openProfile()">
+              <span class="row-title">Perfil</span>
+            </button>
             @if (user.role === 'ADMIN') {
-              <button type="button" class="row" (click)="openAdmin()"><span class="row-title">Gestionar usuarios</span></button>
+              <button type="button" class="row" (click)="openAdmin()">
+                <span class="row-title">Gestionar usuarios</span>
+              </button>
             }
-            <button type="button" class="row" (click)="logout()"><span class="row-title">Cerrar sesión</span></button>
+            <button type="button" class="row" (click)="logout()">
+              <span class="row-title">Cerrar sesión</span>
+            </button>
           </div>
         }
       </div>
@@ -82,15 +99,30 @@
 </header>
 
 <dialog #createDialog class="profile-dialog">
-  <form (submit)="$event.preventDefault(); createBoard(titleField.value, wsField.value)">
+  <form
+    (submit)="
+      $event.preventDefault(); createBoard(titleField.value, wsField.value)
+    "
+  >
     <p class="label-caps">Crear tablero</p>
     <label class="label-caps" for="board-title">Título del tablero</label>
-    <input #titleField id="board-title" type="text" maxlength="100" autofocus autocomplete="off" />
+    <input
+      #titleField
+      id="board-title"
+      type="text"
+      maxlength="100"
+      autofocus
+      autocomplete="off"
+    />
     <label class="label-caps" for="board-workspace">Espacio de trabajo</label>
     <!-- No workspaces yet: "" (the API files it in a new default one), plus the create option.
          `selected` on the first real option: these render after the static create option, which
          the browser would otherwise have auto-selected as the only option present. -->
-    <select #wsField id="board-workspace" (change)="newWorkspace.set(wsField.value === NEW_WS)">
+    <select
+      #wsField
+      id="board-workspace"
+      (change)="newWorkspace.set(wsField.value === NEW_WS)"
+    >
       @for (w of ownWorkspaces(); track w.id; let first = $first) {
         <option [value]="w.id" [selected]="first">{{ w.name }}</option>
       } @empty {
@@ -99,12 +131,28 @@
       <option [value]="NEW_WS">+ Crear espacio de trabajo&hellip;</option>
     </select>
     @if (newWorkspace()) {
-      <label class="label-caps" for="new-workspace">Nombre del nuevo espacio de trabajo</label>
-      <input #newWsField id="new-workspace" type="text" maxlength="60" placeholder="p. ej. Software" autocomplete="off" autofocus />
+      <label class="label-caps" for="new-workspace"
+        >Nombre del nuevo espacio de trabajo</label
+      >
+      <input
+        #newWsField
+        id="new-workspace"
+        type="text"
+        maxlength="60"
+        placeholder="p. ej. Software"
+        autocomplete="off"
+        autofocus
+      />
     }
     <div class="dialog-actions">
       <button type="submit" class="btn btn-primary">Crear</button>
-      <button type="button" class="btn btn-outline" (click)="createDialog.close()">Cancelar</button>
+      <button
+        type="button"
+        class="btn btn-outline"
+        (click)="createDialog.close()"
+      >
+        Cancelar
+      </button>
     </div>
   </form>
 </dialog>
@@ -122,16 +170,36 @@
     [value]="auth.currentUser()?.displayName ?? ''"
   />
   <div class="dialog-actions">
-    <button type="button" class="btn btn-primary" (click)="saveProfile(nameField.value)">Guardar</button>
-    <button type="button" class="btn btn-outline" (click)="profileDialog.close()">Cancelar</button>
+    <button
+      type="button"
+      class="btn btn-primary"
+      (click)="saveProfile(nameField.value)"
+    >
+      Guardar
+    </button>
+    <button
+      type="button"
+      class="btn btn-outline"
+      (click)="profileDialog.close()"
+    >
+      Cancelar
+    </button>
   </div>
 
   <div class="pw-section">
     <p class="label-caps">Contraseña</p>
     @if (auth.currentUser()?.hasPassword) {
-      <a routerLink="/account/password" class="btn btn-outline pw-link" (click)="profileDialog.close()">Cambiar contraseña</a>
+      <a
+        routerLink="/account/password"
+        class="btn btn-outline pw-link"
+        (click)="profileDialog.close()"
+        >Cambiar contraseña</a
+      >
     } @else {
-      <p class="acc-email">Inicias sesión con Microsoft, así que aquí no hay contraseña que cambiar.</p>
+      <p class="acc-email">
+        Inicias sesión con Microsoft, así que aquí no hay contraseña que
+        cambiar.
+      </p>
     }
   </div>
 </dialog>

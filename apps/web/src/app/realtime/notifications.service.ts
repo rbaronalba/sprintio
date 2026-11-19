@@ -49,7 +49,9 @@ export class NotificationsService {
     this.http.post('/notifications/read', {}).subscribe(() => {
       this.unread.set(0);
       const readAt = new Date().toISOString();
-      this.items.update((items) => items.map((n) => ({ ...n, readAt: n.readAt ?? readAt })));
+      this.items.update((items) =>
+        items.map((n) => ({ ...n, readAt: n.readAt ?? readAt })),
+      );
     });
   }
 }

@@ -1,0 +1,8 @@
+{
+  "testRunner": "vitest",
+  "plugins": ["@stryker-mutator/vitest-runner"],
+  "mutate": ["src/common/position.ts", "src/auth/microsoft.ts"],
+  "ignorePatterns": [".windsurf", ".claude", ".agents", "dist", "uploads", "coverage"],
+  "reporters": ["clear-text"],
+  "thresholds": { "high": 80, "low": 60, "break": 70 }
+}

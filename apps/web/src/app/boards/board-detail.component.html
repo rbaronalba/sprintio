@@ -8,7 +8,7 @@
       class="board-title-input"
       maxlength="100"
       aria-label="Título del tablero"
-      autofocus
+      appAutofocus
       [value]="board()?.title ?? ''"
       (focus)="boardTitleInput.select()"
       (blur)="renameBoard(boardTitleInput.value)"
@@ -16,51 +16,118 @@
       (keydown.escape)="renamingBoard.set(false)"
     />
   } @else {
-  <div class="dd" (focusout)="boardsOpen.set(false)">
-    <button type="button" class="board-title" aria-haspopup="menu" (click)="toggleBoards()">
-      {{ board()?.title }} <span aria-hidden="true">&#9662;</span>
-    </button>
-    @if (boardsOpen()) {
-      <div class="pop-menu" role="menu" (mousedown)="$event.preventDefault()">
-        @if (isOwner()) {
-          <button type="button" class="pop-menu-item" (click)="boardsOpen.set(false); renamingBoard.set(true)">Renombrar tablero</button>
-        }
-        <button type="button" class="pop-menu-item" (click)="openArchived(archivedDialog)">Tarjetas archivadas</button>
-        <p class="pop-menu-title">Tus tableros</p>
-        @for (b of allBoards(); track b.id) {
-          <button type="button" class="pop-menu-item" [class.current]="b.id === boardId" (click)="switchBoard(b.id)">{{ b.title }}</button>
-        }
-      </div>
+    <div class="dd" (focusout)="boardsOpen.set(false)">
+      <button
+        type="button"
+        class="board-title"
+        aria-haspopup="menu"
+        (click)="toggleBoards()"
+      >
+        {{ board()?.title }} <span aria-hidden="true">&#9662;</span>
+      </button>
+      @if (boardsOpen()) {
+        <div class="pop-menu" role="menu" (mousedown)="$event.preventDefault()">
+          @if (isOwner()) {
+            <button
+              type="button"
+              class="pop-menu-item"
+              (click)="boardsOpen.set(false); renamingBoard.set(true)"
+            >
+              Renombrar tablero
+            </button>
+          }
+          <button
+            type="button"
+            class="pop-menu-item"
+            (click)="openArchived(archivedDialog)"
+          >
+            Tarjetas archivadas
+          </button>
+          <p class="pop-menu-title">Tus tableros</p>
+          @for (b of allBoards(); track b.id) {
+            <button
+              type="button"
+              class="pop-menu-item"
+              [class.current]="b.id === boardId"
+              (click)="switchBoard(b.id)"
+            >
+              {{ b.title }}
+            </button>
+          }
+        </div>
+      }
+    </div>
+    @if (isOwner()) {
+      <button
+        type="button"
+        class="icon-tool"
+        aria-label="Renombrar tablero"
+        title="Renombrar tablero"
+        (click)="renamingBoard.set(true)"
+      >
+        &#9998;
+      </button>
     }
-  </div>
-  @if (isOwner()) {
-    <button type="button" class="icon-tool" aria-label="Renombrar tablero" title="Renombrar tablero" (click)="renamingBoard.set(true)">&#9998;</button>
-  }
   }
   @if (!live()) {
-    <span class="offline" title="Reconectando con las actualizaciones en vivo">Sin conexión</span>
+    <span class="offline" title="Reconectando con las actualizaciones en vivo"
+      >Sin conexión</span
+    >
   }
 
   <div class="bar-right">
     <div class="members" role="group" aria-label="Miembros del tablero">
       @for (m of shownMembers(); track m.userId) {
-        <button type="button" class="avatar" [title]="m.email" [style]="avatarStyle(m.userId)" (click)="membersDialog.showModal()">{{ initials(m.displayName, m.email) }}</button>
+        <button
+          type="button"
+          class="avatar"
+          [title]="m.email"
+          [style]="avatarStyle(m.userId)"
+          (click)="membersDialog.showModal()"
+        >
+          {{ initials(m.displayName, m.email) }}
+        </button>
       }
       @if (hiddenMembers() > 0) {
-        <button type="button" class="avatar more" aria-label="Todos los miembros" (click)="membersDialog.showModal()">+{{ hiddenMembers() }}</button>
+        <button
+          type="button"
+          class="avatar more"
+          aria-label="Todos los miembros"
+          (click)="membersDialog.showModal()"
+        >
+          +{{ hiddenMembers() }}
+        </button>
       }
     </div>
 
     <div class="dd" (focusout)="filterOpen.set(false)">
-      <button type="button" class="icon-tool" [class.on]="filterActive()" aria-label="Filtrar tarjetas" title="Filtrar tarjetas" (click)="filterOpen.set(!filterOpen()); boardsOpen.set(false)">
-        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M1 3h14v1.5H1zm2.5 4h9v1.5h-9zM6 11h4v1.5H6z" /></svg>
+      <button
+        type="button"
+        class="icon-tool"
+        [class.on]="filterActive()"
+        aria-label="Filtrar tarjetas"
+        title="Filtrar tarjetas"
+        (click)="filterOpen.set(!filterOpen()); boardsOpen.set(false)"
+      >
+        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+          <path
+            fill="currentColor"
+            d="M1 3h14v1.5H1zm2.5 4h9v1.5h-9zM6 11h4v1.5H6z"
+          />
+        </svg>
       </button>
       @if (filterOpen()) {
         <div class="pop-menu filter-menu" (mousedown)="$event.preventDefault()">
           <p class="pop-menu-title">Miembros</p>
           @for (m of members(); track m.userId) {
-            <button type="button" class="pop-menu-item filter-row" (click)="toggleFilterMember(m.userId)">
-              <span class="avatar" [style]="avatarStyle(m.userId)">{{ initials(m.displayName, m.email) }}</span>
+            <button
+              type="button"
+              class="pop-menu-item filter-row"
+              (click)="toggleFilterMember(m.userId)"
+            >
+              <span class="avatar" [style]="avatarStyle(m.userId)">{{
+                initials(m.displayName, m.email)
+              }}</span>
               <span class="filter-name">{{ m.displayName || m.email }}</span>
               @if (filterMemberIds().has(m.userId)) {
                 <span class="check" aria-label="Seleccionado">&#10003;</span>
@@ -69,53 +136,123 @@
           }
           <p class="pop-menu-title">Etiquetas</p>
           @for (l of labels(); track l.id) {
-            <button type="button" class="pop-menu-item filter-row" (click)="toggleFilterLabel(l.id)">
-              <span class="label-chip filter-chip" [style]="chipStyle(l.color)">{{ l.name }}</span>
+            <button
+              type="button"
+              class="pop-menu-item filter-row"
+              (click)="toggleFilterLabel(l.id)"
+            >
+              <span
+                class="label-chip filter-chip"
+                [style]="chipStyle(l.color)"
+                >{{ l.name }}</span
+              >
               @if (filterLabelIds().has(l.id)) {
                 <span class="check" aria-label="Seleccionado">&#10003;</span>
               }
             </button>
           }
           @if (filterActive()) {
-            <button type="button" class="pop-menu-item" (click)="clearFilters()">Quitar filtros</button>
+            <button
+              type="button"
+              class="pop-menu-item"
+              (click)="clearFilters()"
+            >
+              Quitar filtros
+            </button>
           }
         </div>
       }
     </div>
 
     <div class="dd" (focusout)="bgOpen.set(false)">
-      <button type="button" class="icon-tool" aria-label="Cambiar fondo" title="Cambiar fondo" (click)="bgOpen.set(!bgOpen())">
-        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.3" d="M2 2.5h12v11H2z" /><path fill="currentColor" d="M3.5 12l3-4 2 2.5 1.5-1.5 2.5 3z" /><circle cx="11" cy="5.5" r="1.2" fill="currentColor" /></svg>
+      <button
+        type="button"
+        class="icon-tool"
+        aria-label="Cambiar fondo"
+        title="Cambiar fondo"
+        (click)="bgOpen.set(!bgOpen())"
+      >
+        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+          <path
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.3"
+            d="M2 2.5h12v11H2z"
+          />
+          <path fill="currentColor" d="M3.5 12l3-4 2 2.5 1.5-1.5 2.5 3z" />
+          <circle cx="11" cy="5.5" r="1.2" fill="currentColor" />
+        </svg>
       </button>
       @if (bgOpen()) {
         <div class="pop-menu bg-menu" (mousedown)="$event.preventDefault()">
           <p class="pop-menu-title">Fondo del tablero</p>
-          <ng-container *ngTemplateOutlet="bgPicker; context: { $implicit: null }" />
+          <ng-container
+            *ngTemplateOutlet="bgPicker; context: { $implicit: null }"
+          />
         </div>
       }
     </div>
 
-    <button type="button" class="icon-tool" [class.starred]="board()?.starred" [attr.aria-pressed]="board()?.starred" aria-label="Destacar tablero" title="Destacar tablero" (click)="toggleStar()">
-      <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" [attr.fill-opacity]="board()?.starred ? 1 : 0" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" d="M8 1.6l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.4l-3.8 2 .7-4.3-3.1-3 4.3-.6z" /></svg>
+    <button
+      type="button"
+      class="icon-tool"
+      [class.starred]="board()?.starred"
+      [attr.aria-pressed]="board()?.starred"
+      aria-label="Destacar tablero"
+      title="Destacar tablero"
+      (click)="toggleStar()"
+    >
+      <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+        <path
+          fill="currentColor"
+          [attr.fill-opacity]="board()?.starred ? 1 : 0"
+          stroke="currentColor"
+          stroke-width="1.3"
+          stroke-linejoin="round"
+          d="M8 1.6l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.4l-3.8 2 .7-4.3-3.1-3 4.3-.6z"
+        />
+      </svg>
     </button>
 
     @if (isOwner()) {
-      <button type="button" class="btn btn-outline share" (click)="openShare()">Compartir</button>
+      <button type="button" class="btn btn-outline share" (click)="openShare()">
+        Compartir
+      </button>
     }
   </div>
 </header>
 
 <!-- Outside every popover: opening the file dialog blurs them, which would remove an input living inside. -->
-<input #bgFile type="file" hidden accept="image/png,image/jpeg,image/gif,image/webp" (change)="uploadBackground(bgFile)" />
+<input
+  #bgFile
+  type="file"
+  hidden
+  accept="image/png,image/jpeg,image/gif,image/webp"
+  (change)="uploadBackground(bgFile)"
+/>
 
 <ng-template #bgPicker let-list>
   <div class="bg-grid">
     @for (c of labelColors; track c) {
-      <button type="button" class="bg-swatch" [style.background]="c" [attr.aria-label]="'Fondo ' + c" (click)="setBackground(list, c)"></button>
+      <button
+        type="button"
+        class="bg-swatch"
+        [style.background]="c"
+        [attr.aria-label]="'Fondo ' + c"
+        (click)="setBackground(list, c)"
+      ></button>
     }
   </div>
-  <button type="button" class="pop-menu-item" (click)="pickBackgroundImage(list, bgFile)">Subir imagen&hellip;</button>
-  <button type="button" class="pop-menu-item" (click)="setBackground(list, '')">Quitar fondo</button>
+  <button
+    type="button"
+    class="pop-menu-item"
+    (click)="pickBackgroundImage(list, bgFile)"
+  >
+    Subir imagen&hellip;
+  </button>
+  <button type="button" class="pop-menu-item" (click)="setBackground(list, '')">
+    Quitar fondo
+  </button>
 </ng-template>
 
 <main [style]="bgStyle(board()?.background)">
@@ -127,7 +264,12 @@
     (cdkDropListDropped)="dropList($event)"
   >
     @for (list of lists(); track list.id) {
-      <section class="list-col" [class.has-bg]="list.background" [style]="bgStyle(list.background)" cdkDrag>
+      <section
+        class="list-col"
+        [class.has-bg]="list.background"
+        [style]="bgStyle(list.background)"
+        cdkDrag
+      >
         <header class="list-header" cdkDragHandle>
           @if (renaming() === list.id) {
             <input
@@ -135,21 +277,44 @@
               type="text"
               class="rename"
               [value]="list.title"
-              autofocus
+              appAutofocus
               (focus)="titleInput.select()"
               (blur)="rename(list, titleInput)"
               (keydown.enter)="titleInput.blur()"
               (keydown.escape)="renaming.set(null)"
             />
           } @else {
-            <h2 (click)="renaming.set(list.id)">{{ list.title }}</h2>
+            <h2
+              tabindex="0"
+              (click)="renaming.set(list.id)"
+              (keydown.enter)="renaming.set(list.id)"
+            >
+              {{ list.title }}
+            </h2>
           }
           <details #menu class="menu">
-            <summary class="icon-btn" aria-label="Acciones de la lista">&hellip;</summary>
+            <summary class="icon-btn" aria-label="Acciones de la lista">
+              &hellip;
+            </summary>
             <div class="menu-panel">
               <p class="pop-menu-title">Fondo</p>
-              <ng-container *ngTemplateOutlet="bgPicker; context: { $implicit: list }" />
-              <button type="button" class="menu-item" (click)="menu.open = false; askDelete(list.title, () => removeList(list.id), 'También se eliminarán todas sus tarjetas.')">Eliminar lista</button>
+              <ng-container
+                *ngTemplateOutlet="bgPicker; context: { $implicit: list }"
+              />
+              <button
+                type="button"
+                class="menu-item"
+                (click)="
+                  menu.open = false;
+                  askDelete(
+                    list.title,
+                    () => removeList(list.id),
+                    'También se eliminarán todas sus tarjetas.'
+                  )
+                "
+              >
+                Eliminar lista
+              </button>
             </div>
           </details>
         </header>
@@ -178,40 +343,60 @@
                   <span class="label-row">
                     @for (cl of card.labels; track cl.labelId) {
                       @if (labelById().get(cl.labelId); as l) {
-                        <span class="label-chip" [style]="chipStyle(l.color)">{{ l.name }}</span>
+                        <span class="label-chip" [style]="chipStyle(l.color)">{{
+                          l.name
+                        }}</span>
                       }
                     }
                   </span>
                 }
                 <span class="card-title">{{ card.title }}</span>
                 <span class="card-foot">
-                <span class="card-meta">
-                  @if (card.dueDate) {
-                    <span class="due" [class.overdue]="isOverdue(card)" [class.due-done]="card.dueDone">
-                      @if (card.dueDone) {
-                        <span aria-hidden="true">&#10003;</span>
-                      }
-                      {{ formatDueDate(card.dueDate) }}
-                    </span>
-                  }
-                  @if (card.hoursTotal) {
-                    <span>&#9201; {{ card.hoursTotal }}h</span>
-                  }
-                  @if (card._count.checklist) {
-                    <span>&#9745; {{ card.checklistDone }}/{{ card._count.checklist }}</span>
-                  }
-                  @if (card._count.comments) {
-                    <span>&#128172; {{ card._count.comments }}</span>
-                  }
-                  @if (card._count.attachments) {
-                    <span>&#128206; {{ card._count.attachments }}</span>
-                  }
-                </span>
-                <span class="card-avatars">
-                  @for (a of card.assignees; track a.userId) {
-                    <span class="avatar" [title]="emailOf(a.userId)" [style]="avatarStyle(a.userId)">{{ initials(memberOf(a.userId)?.displayName, emailOf(a.userId)) }}</span>
-                  }
-                </span>
+                  <span class="card-meta">
+                    @if (card.dueDate) {
+                      <span
+                        class="due"
+                        [class.overdue]="isOverdue(card)"
+                        [class.due-done]="card.dueDone"
+                      >
+                        @if (card.dueDone) {
+                          <span aria-hidden="true">&#10003;</span>
+                        }
+                        {{ formatDueDate(card.dueDate) }}
+                      </span>
+                    }
+                    @if (card.hoursTotal) {
+                      <span>&#9201; {{ card.hoursTotal }}h</span>
+                    }
+                    @if (card._count.checklist) {
+                      <span
+                        >&#9745; {{ card.checklistDone }}/{{
+                          card._count.checklist
+                        }}</span
+                      >
+                    }
+                    @if (card._count.comments) {
+                      <span>&#128172; {{ card._count.comments }}</span>
+                    }
+                    @if (card._count.attachments) {
+                      <span>&#128206; {{ card._count.attachments }}</span>
+                    }
+                  </span>
+                  <span class="card-avatars">
+                    @for (a of card.assignees; track a.userId) {
+                      <span
+                        class="avatar"
+                        [title]="emailOf(a.userId)"
+                        [style]="avatarStyle(a.userId)"
+                        >{{
+                          initials(
+                            memberOf(a.userId)?.displayName,
+                            emailOf(a.userId)
+                          )
+                        }}</span
+                      >
+                    }
+                  </span>
                 </span>
               </div>
               <span class="card-tools">
@@ -219,7 +404,10 @@
                   type="button"
                   class="icon-btn card-tool"
                   aria-label="Miembros"
-                  (click)="$event.stopPropagation(); openMembers(card, $any($event.currentTarget))"
+                  (click)="
+                    $event.stopPropagation();
+                    openMembers(card, $any($event.currentTarget))
+                  "
                   (keydown.enter)="$event.stopPropagation()"
                 >
                   +
@@ -239,52 +427,80 @@
         </div>
 
         @if (addingIn() === list.id) {
-          <form class="composer" (submit)="$event.preventDefault(); addCard(list, cardInput)">
+          <form
+            class="composer"
+            (submit)="$event.preventDefault(); addCard(list, cardInput)"
+          >
             <input
               #cardInput
               type="text"
               placeholder="Título de la tarjeta"
-              autofocus
+              appAutofocus
               (keydown.escape)="addingIn.set(null)"
             />
             <div class="composer-actions">
-              <button type="submit" class="btn btn-primary">Añadir tarjeta</button>
-              <button type="button" class="icon-btn" aria-label="Cancelar" (click)="addingIn.set(null)">
+              <button type="submit" class="btn btn-primary">
+                Añadir tarjeta
+              </button>
+              <button
+                type="button"
+                class="icon-btn"
+                aria-label="Cancelar"
+                (click)="addingIn.set(null)"
+              >
                 &times;
               </button>
             </div>
           </form>
         } @else {
-          <button type="button" class="ghost" (click)="addingIn.set(list.id)">+ Añadir una tarjeta</button>
+          <button type="button" class="ghost" (click)="addingIn.set(list.id)">
+            + Añadir una tarjeta
+          </button>
         }
       </section>
     }
 
     @if (addingList()) {
-      <form class="list-col composer" (submit)="$event.preventDefault(); addList(listInput)">
+      <form
+        class="list-col composer"
+        (submit)="$event.preventDefault(); addList(listInput)"
+      >
         <input
           #listInput
           type="text"
           placeholder="Título de la lista"
-          autofocus
+          appAutofocus
           (keydown.escape)="addingList.set(false)"
         />
         <div class="composer-actions">
           <button type="submit" class="btn btn-primary">Añadir lista</button>
-          <button type="button" class="icon-btn" aria-label="Cancelar" (click)="addingList.set(false)">
+          <button
+            type="button"
+            class="icon-btn"
+            aria-label="Cancelar"
+            (click)="addingList.set(false)"
+          >
             &times;
           </button>
         </div>
       </form>
     } @else {
-      <button type="button" class="ghost add-list" (click)="addingList.set(true)">
+      <button
+        type="button"
+        class="ghost add-list"
+        (click)="addingList.set(true)"
+      >
         + Añadir otra lista
       </button>
     }
   </div>
 </main>
 
-<dialog #cardDialog class="card-dialog card-dialog-wide" (close)="onCardDialogClose()">
+<dialog
+  #cardDialog
+  class="card-dialog card-dialog-wide"
+  (close)="onCardDialogClose()"
+>
   @if (editing(); as card) {
     <form
       class="card-dialog-grid"
@@ -304,15 +520,48 @@
         </select>
         <div class="card-head-tools">
           <details #cardMenu class="menu">
-            <summary class="icon-btn" aria-label="Acciones de la tarjeta">&#8943;</summary>
+            <summary class="icon-btn" aria-label="Acciones de la tarjeta">
+              &#8943;
+            </summary>
             <div class="menu-panel">
-              <button type="button" class="menu-item" (click)="cardMenu.open = false; listTab.showPicker()">Mover tarjeta</button>
-              <button type="button" class="menu-item" (click)="cardMenu.open = false; copyCard(card)">Copiar</button>
-              <button type="button" class="menu-item" (click)="cardMenu.open = false; shareCard(card)">Compartir</button>
-              <button type="button" class="menu-item" (click)="cardMenu.open = false; archiveCard(card)">Archivar</button>
+              <button
+                type="button"
+                class="menu-item"
+                (click)="cardMenu.open = false; listTab.showPicker()"
+              >
+                Mover tarjeta
+              </button>
+              <button
+                type="button"
+                class="menu-item"
+                (click)="cardMenu.open = false; copyCard(card)"
+              >
+                Copiar
+              </button>
+              <button
+                type="button"
+                class="menu-item"
+                (click)="cardMenu.open = false; shareCard(card)"
+              >
+                Compartir
+              </button>
+              <button
+                type="button"
+                class="menu-item"
+                (click)="cardMenu.open = false; archiveCard(card)"
+              >
+                Archivar
+              </button>
             </div>
           </details>
-          <button type="button" class="icon-btn" aria-label="Cerrar" (click)="cardDialog.close()">&times;</button>
+          <button
+            type="button"
+            class="icon-btn"
+            aria-label="Cerrar"
+            (click)="cardDialog.close()"
+          >
+            &times;
+          </button>
         </div>
       </div>
 
@@ -331,28 +580,58 @@
             (keydown.escape)="editingTitle.set(false)"
           />
         } @else {
-          <h2 class="card-title-display" (click)="editingTitle.set(true)">{{ card.title }}</h2>
+          <h2
+            class="card-title-display"
+            tabindex="0"
+            (click)="editingTitle.set(true)"
+            (keydown.enter)="editingTitle.set(true)"
+          >
+            {{ card.title }}
+          </h2>
         }
 
         <div class="card-meta-row">
           <div class="meta-col">
-            <label class="label-caps">Miembros</label>
+            <span class="label-caps">Miembros</span>
             <div class="meta-chips">
               @for (a of card.assignees; track a.userId) {
-                <span class="avatar" [title]="emailOf(a.userId)" [style]="avatarStyle(a.userId)">{{ initials(memberOf(a.userId)?.displayName, emailOf(a.userId)) }}</span>
+                <span
+                  class="avatar"
+                  [title]="emailOf(a.userId)"
+                  [style]="avatarStyle(a.userId)"
+                  >{{
+                    initials(memberOf(a.userId)?.displayName, emailOf(a.userId))
+                  }}</span
+                >
               }
-              <button type="button" class="add-chip" aria-label="Añadir miembros" (click)="openMembers(card, $any($event.currentTarget))">+</button>
+              <button
+                type="button"
+                class="add-chip"
+                aria-label="Añadir miembros"
+                (click)="openMembers(card, $any($event.currentTarget))"
+              >
+                +
+              </button>
             </div>
           </div>
           <div class="meta-col">
-            <label class="label-caps">Etiquetas</label>
+            <span class="label-caps">Etiquetas</span>
             <div class="meta-chips">
               @for (l of labels(); track l.id) {
                 @if (isLabelOn(card, l)) {
-                  <span class="label-chip" [style]="chipStyle(l.color)">{{ l.name }}</span>
+                  <span class="label-chip" [style]="chipStyle(l.color)">{{
+                    l.name
+                  }}</span>
                 }
               }
-              <button type="button" class="add-chip" aria-label="Añadir etiquetas" (click)="openLabels(card, $any($event.currentTarget))">+</button>
+              <button
+                type="button"
+                class="add-chip"
+                aria-label="Añadir etiquetas"
+                (click)="openLabels(card, $any($event.currentTarget))"
+              >
+                +
+              </button>
             </div>
           </div>
           <div class="meta-col">
@@ -369,14 +648,20 @@
               @if (card.dueDate) {
                 <!-- Inline: board-detail.component.scss is at its size budget. -->
                 <label style="display: flex; align-items: center; gap: 4px">
-                  <input type="checkbox" style="width: auto" [checked]="card.dueDone" (change)="toggleDueDone(card)" /> Hecha
+                  <input
+                    type="checkbox"
+                    style="width: auto"
+                    [checked]="card.dueDone"
+                    (change)="toggleDueDone(card)"
+                  />
+                  Hecha
                 </label>
               }
             </div>
           </div>
         </div>
 
-        <label class="label-caps" >Descripción</label>
+        <span class="label-caps">Descripción</span>
         <app-rich-editor
           #descField
           [rows]="5"
@@ -384,12 +669,12 @@
           [initial]="card.description ?? ''"
         />
 
-        <label class="label-caps">
+        <span class="label-caps">
           Checklist
           @if (checklist().length) {
             &mdash; {{ card.checklistDone }}/{{ checklist().length }}
           }
-        </label>
+        </span>
         <ul class="checklist">
           @for (i of checklist(); track i.id) {
             <li class="checklist-item">
@@ -399,8 +684,17 @@
                 [checked]="i.done"
                 (change)="toggleChecklistItem(card, i)"
               />
-              <label [for]="'chk-' + i.id" [class.done]="i.done">{{ i.text }}</label>
-              <button type="button" class="icon-btn" aria-label="Eliminar elemento" (click)="removeChecklistItem(card, i)">&times;</button>
+              <label [for]="'chk-' + i.id" [class.done]="i.done">{{
+                i.text
+              }}</label>
+              <button
+                type="button"
+                class="icon-btn"
+                aria-label="Eliminar elemento"
+                (click)="removeChecklistItem(card, i)"
+              >
+                &times;
+              </button>
             </li>
           }
         </ul>
@@ -410,50 +704,108 @@
             type="text"
             placeholder="Añadir un elemento"
             maxlength="200"
-            (keydown.enter)="$event.preventDefault(); addChecklistItem(card, itemInput)"
+            (keydown.enter)="
+              $event.preventDefault(); addChecklistItem(card, itemInput)
+            "
           />
-          <button type="button" class="btn btn-outline" (click)="addChecklistItem(card, itemInput)">Añadir</button>
+          <button
+            type="button"
+            class="btn btn-outline"
+            (click)="addChecklistItem(card, itemInput)"
+          >
+            Añadir
+          </button>
         </div>
 
         <div class="section-head">
           <span class="section-icon" aria-hidden="true">&#9201;</span>
           <h3 class="section-title">Registro de tiempo</h3>
         </div>
-        <p class="time-summary">Tiempo: <strong>{{ card.hoursTotal }}h</strong></p>
+        <p class="time-summary">
+          Tiempo: <strong>{{ card.hoursTotal }}h</strong>
+        </p>
         <div class="time-me">
           <span class="time-me-who">
-            <span class="avatar" [style]="avatarStyle(currentUserId)">{{ initials(memberOf(currentUserId ?? '')?.displayName, emailOf(currentUserId ?? '')) }}</span>
-            <span>{{ memberOf(currentUserId ?? '')?.displayName || emailOf(currentUserId ?? '') }}</span>
+            <span class="avatar" [style]="avatarStyle(currentUserId)">{{
+              initials(
+                memberOf(currentUserId ?? '')?.displayName,
+                emailOf(currentUserId ?? '')
+              )
+            }}</span>
+            <span>{{
+              memberOf(currentUserId ?? '')?.displayName ||
+                emailOf(currentUserId ?? '')
+            }}</span>
           </span>
-          <button type="button" class="btn btn-outline time-add" (click)="openTime($any($event.currentTarget), timePop)">Añadir tiempo</button>
+          <button
+            type="button"
+            class="btn btn-outline time-add"
+            (click)="openTime($any($event.currentTarget), timePop)"
+          >
+            Añadir tiempo
+          </button>
         </div>
         <ul class="time-list">
           @for (e of timeEntries(); track e.id) {
             <li class="time-row">
               <span class="time-date">{{ formatEntryDate(e.date) }}</span>
               <span class="time-hours">{{ e.hours }}h</span>
-              <span class="time-who">{{ e.user.displayName || e.user.email }}</span>
+              <span class="time-who">{{
+                e.user.displayName || e.user.email
+              }}</span>
               @if (e.note) {
                 <span class="time-note">{{ e.note }}</span>
               }
               @if (e.userId === currentUserId) {
-                <button type="button" class="icon-btn" aria-label="Editar registro de tiempo" (click)="openTime($any($event.currentTarget), timePop, e)">&#9998;</button>
-                <button type="button" class="icon-btn" aria-label="Eliminar registro de tiempo" (click)="removeTimeEntry(card, e)">&times;</button>
+                <button
+                  type="button"
+                  class="icon-btn"
+                  aria-label="Editar registro de tiempo"
+                  (click)="openTime($any($event.currentTarget), timePop, e)"
+                >
+                  &#9998;
+                </button>
+                <button
+                  type="button"
+                  class="icon-btn"
+                  aria-label="Eliminar registro de tiempo"
+                  (click)="removeTimeEntry(card, e)"
+                >
+                  &times;
+                </button>
               }
             </li>
           }
         </ul>
 
         <div class="dialog-actions">
-          <button type="submit" class="btn btn-primary" (mousedown)="$event.preventDefault()">Guardar</button>
-          <button type="button" class="btn btn-outline" (click)="cardDialog.close()">Cancelar</button>
-          <button type="button" class="icon-btn danger" (click)="askDeleteCard(card)">Eliminar tarjeta</button>
+          <button
+            type="submit"
+            class="btn btn-primary"
+            (mousedown)="$event.preventDefault()"
+          >
+            Guardar
+          </button>
+          <button
+            type="button"
+            class="btn btn-outline"
+            (click)="cardDialog.close()"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            class="icon-btn danger"
+            (click)="askDeleteCard(card)"
+          >
+            Eliminar tarjeta
+          </button>
         </div>
       </div>
 
       <div class="card-dialog-side">
         <div class="side-head">
-          <label class="label-caps">Comentarios</label>
+          <span class="label-caps">Comentarios</span>
           <input
             #fileInput
             type="file"
@@ -469,7 +821,14 @@
                 <div class="attachment-meta">
                   <span class="attachment-name">{{ a.originalName }}</span>
                   @if (a.uploaderId === currentUserId) {
-                    <button type="button" class="icon-btn" aria-label="Eliminar adjunto" (click)="removeAttachment(card, a)">&times;</button>
+                    <button
+                      type="button"
+                      class="icon-btn"
+                      aria-label="Eliminar adjunto"
+                      (click)="removeAttachment(card, a)"
+                    >
+                      &times;
+                    </button>
                   }
                 </div>
               </div>
@@ -477,29 +836,56 @@
           </div>
         }
         @if (moreComments()) {
-          <button type="button" class="link-btn older-comments" (click)="loadOlderComments(card)">Ver comentarios anteriores</button>
+          <button
+            type="button"
+            class="link-btn older-comments"
+            (click)="loadOlderComments(card)"
+          >
+            Ver comentarios anteriores
+          </button>
         }
         <ul class="comment-list">
           @for (c of comments(); track c.id) {
             <li class="comment">
-              <span class="avatar" [style]="avatarStyle(c.authorId)">{{ initials(c.author.displayName, c.author.email) }}</span>
+              <span class="avatar" [style]="avatarStyle(c.authorId)">{{
+                initials(c.author.displayName, c.author.email)
+              }}</span>
               <div class="comment-body">
                 <p class="comment-meta">{{ c.author.email }}</p>
                 @if (c.body) {
-                  <div class="comment-text rich-out" [innerHTML]="c.body | rich"></div>
+                  <div
+                    class="comment-text rich-out"
+                    [innerHTML]="c.body | rich"
+                  ></div>
                 }
                 @for (a of c.attachments; track a.id) {
                   @if (isImage(a)) {
-                    <a class="comment-img" [href]="attachmentUrl(a)" target="_blank" rel="noopener">
+                    <a
+                      class="comment-img"
+                      [href]="attachmentUrl(a)"
+                      target="_blank"
+                      rel="noopener"
+                    >
                       <img [src]="attachmentUrl(a)" [alt]="a.originalName" />
                     </a>
                   } @else {
-                    <a [href]="attachmentUrl(a)" [attr.download]="a.originalName">&#128206; {{ a.originalName }}</a>
+                    <a
+                      [href]="attachmentUrl(a)"
+                      [attr.download]="a.originalName"
+                      >&#128206; {{ a.originalName }}</a
+                    >
                   }
                 }
               </div>
               @if (c.authorId === currentUserId) {
-                <button type="button" class="icon-btn" aria-label="Eliminar comentario" (click)="removeComment(card, c)">&times;</button>
+                <button
+                  type="button"
+                  class="icon-btn"
+                  aria-label="Eliminar comentario"
+                  (click)="removeComment(card, c)"
+                >
+                  &times;
+                </button>
               }
             </li>
           }
@@ -510,18 +896,40 @@
             [rows]="2"
             hint="Escribe tu comentario aquí — @email para mencionar a un miembro"
           >
-            <button type="button" class="attach-btn" aria-label="Adjuntar archivo" title="Adjuntar un archivo (imágenes, PDF, logs, vídeo, zip; máx. 25 MB)" (click)="fileInput.click()">&#128206;</button>
+            <button
+              type="button"
+              class="attach-btn"
+              aria-label="Adjuntar archivo"
+              title="Adjuntar un archivo (imágenes, PDF, logs, vídeo, zip; máx. 25 MB)"
+              (click)="fileInput.click()"
+            >
+              &#128206;
+            </button>
           </app-rich-editor>
           @if (pendingFile(); as f) {
             <p class="pending-file">
               <span class="attachment-name">&#128206; {{ f.name }}</span>
-              <button type="button" class="icon-btn" aria-label="Quitar archivo" (click)="pendingFile.set(null)">&times;</button>
+              <button
+                type="button"
+                class="icon-btn"
+                aria-label="Quitar archivo"
+                (click)="pendingFile.set(null)"
+              >
+                &times;
+              </button>
             </p>
           }
-          <button type="button" class="btn btn-outline" (mousedown)="$event.preventDefault()" (click)="addComment(card, commentField)">Comentar</button>
+          <button
+            type="button"
+            class="btn btn-outline"
+            (mousedown)="$event.preventDefault()"
+            (click)="addComment(card, commentField)"
+          >
+            Comentar
+          </button>
         </div>
 
-        <label class="label-caps activity-head">Actividad</label>
+        <span class="label-caps activity-head">Actividad</span>
         <ul class="activity-list">
           @for (a of activity(); track a.id) {
             <li class="activity-row">
@@ -541,11 +949,25 @@
     <div #timePop popover class="member-pop time-pop">
       <div class="pop-head">
         <span></span>
-        <p class="pop-head-title">{{ editingEntry() ? 'Editar tiempo' : 'Añadir tiempo' }}</p>
-        <button type="button" class="icon-btn" aria-label="Cerrar" (click)="timePop.hidePopover()">&times;</button>
+        <p class="pop-head-title">
+          {{ editingEntry() ? 'Editar tiempo' : 'Añadir tiempo' }}
+        </p>
+        <button
+          type="button"
+          class="icon-btn"
+          aria-label="Cerrar"
+          (click)="timePop.hidePopover()"
+        >
+          &times;
+        </button>
       </div>
       <label class="pop-field" for="time-member">Miembro</label>
-      <select id="time-member" [disabled]="!!editingEntry()" [value]="timeMemberId()" (change)="timeMemberId.set($any($event.target).value)">
+      <select
+        id="time-member"
+        [disabled]="!!editingEntry()"
+        [value]="timeMemberId()"
+        (change)="timeMemberId.set($any($event.target).value)"
+      >
         @for (m of members(); track m.userId) {
           <option [value]="m.userId">{{ m.displayName || m.email }}</option>
         }
@@ -564,7 +986,13 @@
         </div>
         <div>
           <label class="pop-field" for="time-date">Fecha</label>
-          <input id="time-date" type="date" [disabled]="!!editingEntry()" [value]="timeDate()" (input)="timeDate.set($any($event.target).value)" />
+          <input
+            id="time-date"
+            type="date"
+            [disabled]="!!editingEntry()"
+            [value]="timeDate()"
+            (input)="timeDate.set($any($event.target).value)"
+          />
         </div>
       </div>
       <label class="pop-field" for="time-note">Comentario</label>
@@ -577,7 +1005,14 @@
         (input)="timeNote.set($any($event.target).value)"
       ></textarea>
       <div class="pop-foot">
-        <button type="button" class="btn btn-primary" [disabled]="timeHoursValue() === null || !timeDate()" (click)="saveTimeEntry(card, timePop)">{{ editingEntry() ? 'Guardar' : 'Añadir' }}</button>
+        <button
+          type="button"
+          class="btn btn-primary"
+          [disabled]="timeHoursValue() === null || !timeDate()"
+          (click)="saveTimeEntry(card, timePop)"
+        >
+          {{ editingEntry() ? 'Guardar' : 'Añadir' }}
+        </button>
       </div>
     </div>
   }
@@ -594,26 +1029,61 @@
         <ul>
           @for (l of labels(); track l.id) {
             <li class="label-pop-row">
-              <button type="button" class="member-row" (click)="toggleLabel(card, l)">
-                <span class="label-chip" [style]="chipStyle(l.color)">{{ l.name }}</span>
+              <button
+                type="button"
+                class="member-row"
+                (click)="toggleLabel(card, l)"
+              >
+                <span class="label-chip" [style]="chipStyle(l.color)">{{
+                  l.name
+                }}</span>
                 @if (isLabelOn(card, l)) {
                   <span class="check" aria-label="Aplicada">&#10003;</span>
                 }
               </button>
-              <button type="button" class="icon-btn label-remove" aria-label="Eliminar etiqueta" (click)="removeBoardLabel(l)">&times;</button>
+              <button
+                type="button"
+                class="icon-btn label-remove"
+                aria-label="Eliminar etiqueta"
+                (click)="removeBoardLabel(l)"
+              >
+                &times;
+              </button>
             </li>
           }
         </ul>
       }
-      <button type="button" class="btn btn-outline pop-wide" (click)="startCreateLabel()">Crear una etiqueta nueva</button>
+      <button
+        type="button"
+        class="btn btn-outline pop-wide"
+        (click)="startCreateLabel()"
+      >
+        Crear una etiqueta nueva
+      </button>
     } @else {
       <div class="pop-head">
-        <button type="button" class="icon-btn" aria-label="Atrás" (click)="setLabelView('list')">&#8249;</button>
+        <button
+          type="button"
+          class="icon-btn"
+          aria-label="Atrás"
+          (click)="setLabelView('list')"
+        >
+          &#8249;
+        </button>
         <p class="pop-head-title">Crear etiqueta</p>
-        <button type="button" class="icon-btn" aria-label="Cerrar" (click)="labelPop.hidePopover()">&times;</button>
+        <button
+          type="button"
+          class="icon-btn"
+          aria-label="Cerrar"
+          (click)="labelPop.hidePopover()"
+        >
+          &times;
+        </button>
       </div>
       <div class="label-preview">
-        <span class="label-chip" [style]="chipStyle(pickedColor())">{{ newLabelName() }}</span>
+        <span class="label-chip" [style]="chipStyle(pickedColor())">{{
+          newLabelName()
+        }}</span>
       </div>
       <label class="pop-field" for="new-label-name">Título</label>
       <input
@@ -641,9 +1111,23 @@
           </button>
         }
       </div>
-      <button type="button" class="btn btn-outline pop-wide" [disabled]="!pickedColor()" (click)="pickedColor.set('')">&times; Quitar color</button>
+      <button
+        type="button"
+        class="btn btn-outline pop-wide"
+        [disabled]="!pickedColor()"
+        (click)="pickedColor.set('')"
+      >
+        &times; Quitar color
+      </button>
       <div class="pop-foot">
-        <button type="button" class="btn btn-primary" [disabled]="!newLabelName().trim() && !pickedColor()" (click)="createLabel()">Crear</button>
+        <button
+          type="button"
+          class="btn btn-primary"
+          [disabled]="!newLabelName().trim() && !pickedColor()"
+          (click)="createLabel()"
+        >
+          Crear
+        </button>
       </div>
     }
   </div>
@@ -652,7 +1136,8 @@
 <dialog #confirmDialog class="card-dialog confirm-dialog">
   <p>
     ¿Seguro que quieres {{ pendingDelete()?.verb ?? 'eliminar' }}
-    <strong>{{ pendingDelete()?.name }}</strong>? {{ pendingDelete()?.note ?? '' }}
+    <strong>{{ pendingDelete()?.name }}</strong
+    >? {{ pendingDelete()?.note ?? '' }}
     @if (!pendingDelete()?.verb) {
       Esta acción no se puede deshacer.
     }
@@ -661,7 +1146,13 @@
     <button type="button" class="btn btn-primary" (click)="confirmDelete()">
       {{ pendingDelete()?.label ?? 'Eliminar' }}
     </button>
-    <button type="button" class="btn btn-outline" (click)="confirmDialog.close()">Cancelar</button>
+    <button
+      type="button"
+      class="btn btn-outline"
+      (click)="confirmDialog.close()"
+    >
+      Cancelar
+    </button>
   </div>
 </dialog>
 
@@ -671,9 +1162,17 @@
     <ul>
       @for (m of members(); track m.userId) {
         <li>
-          <button type="button" class="member-row" (click)="toggleAssignee(card, m)">
-            <span class="avatar" [style]="avatarStyle(m.userId)">{{ initials(m.displayName, m.email) }}</span>
-            <span class="member-email" [title]="m.email">{{ m.displayName || m.email }}</span>
+          <button
+            type="button"
+            class="member-row"
+            (click)="toggleAssignee(card, m)"
+          >
+            <span class="avatar" [style]="avatarStyle(m.userId)">{{
+              initials(m.displayName, m.email)
+            }}</span>
+            <span class="member-email" [title]="m.email">{{
+              m.displayName || m.email
+            }}</span>
             @if (isAssigned(card, m.userId)) {
               <span class="check" aria-label="Asignado">&#10003;</span>
             }
@@ -694,22 +1193,36 @@
   <ul class="member-list">
     @for (m of members(); track m.userId) {
       <li class="member-line">
-        <span class="avatar" [style]="avatarStyle(m.userId)">{{ initials(m.displayName, m.email) }}</span>
+        <span class="avatar" [style]="avatarStyle(m.userId)">{{
+          initials(m.displayName, m.email)
+        }}</span>
         <span class="member-email">{{ m.email }}</span>
         @if (m.userId === board()?.ownerId) {
           <span class="member-note">Administrador</span>
         } @else if (isOwner()) {
-          <button type="button" class="icon-btn" (click)="askMakeOwner(m)">Hacer administrador</button>
-          <button type="button" class="icon-btn" (click)="askRemoveMember(m)">Quitar</button>
+          <button type="button" class="icon-btn" (click)="askMakeOwner(m)">
+            Hacer administrador
+          </button>
+          <button type="button" class="icon-btn" (click)="askRemoveMember(m)">
+            Quitar
+          </button>
         }
       </li>
     }
   </ul>
   <div class="dialog-actions">
     @if (!isOwner()) {
-      <button type="button" class="btn btn-outline" (click)="askLeave()">Salir del tablero</button>
+      <button type="button" class="btn btn-outline" (click)="askLeave()">
+        Salir del tablero
+      </button>
     }
-    <button type="button" class="icon-btn danger" (click)="membersDialog.close()">Cerrar</button>
+    <button
+      type="button"
+      class="icon-btn danger"
+      (click)="membersDialog.close()"
+    >
+      Cerrar
+    </button>
   </div>
 </dialog>
 
@@ -720,14 +1233,22 @@
       <li class="member-line">
         <span class="member-email">{{ c.title }}</span>
         <span class="member-note">{{ c.list.title }}</span>
-        <button type="button" class="icon-btn" (click)="restoreCard(c.id)">Restaurar</button>
+        <button type="button" class="icon-btn" (click)="restoreCard(c.id)">
+          Restaurar
+        </button>
       </li>
     } @empty {
       <li class="member-note">No hay tarjetas archivadas.</li>
     }
   </ul>
   <div class="dialog-actions">
-    <button type="button" class="icon-btn danger" (click)="archivedDialog.close()">Cerrar</button>
+    <button
+      type="button"
+      class="icon-btn danger"
+      (click)="archivedDialog.close()"
+    >
+      Cerrar
+    </button>
   </div>
 </dialog>
 
@@ -735,20 +1256,51 @@
   <p class="label-caps">Compartir este tablero</p>
   @if (shareLink(); as link) {
     <p class="share-note">
-      Cualquier persona con sesión iniciada que abra este enlace puede unirse al tablero. Dejar de
-      compartir anula el enlace; quienes ya se unieron conservan el acceso.
+      Cualquier persona con sesión iniciada que abra este enlace puede unirse al
+      tablero. Dejar de compartir anula el enlace; quienes ya se unieron
+      conservan el acceso.
     </p>
-    <input #linkInput type="text" readonly [value]="link" aria-label="Enlace de invitación" />
+    <input
+      #linkInput
+      type="text"
+      readonly
+      [value]="link"
+      aria-label="Enlace de invitación"
+    />
     <div class="dialog-actions">
-      <button type="button" class="btn btn-primary" (click)="copyLink(linkInput)">Copiar enlace</button>
-      <button type="button" class="btn btn-outline" (click)="stopSharing()">Dejar de compartir</button>
-      <button type="button" class="icon-btn danger" (click)="shareDialog.close()">Cerrar</button>
+      <button
+        type="button"
+        class="btn btn-primary"
+        (click)="copyLink(linkInput)"
+      >
+        Copiar enlace
+      </button>
+      <button type="button" class="btn btn-outline" (click)="stopSharing()">
+        Dejar de compartir
+      </button>
+      <button
+        type="button"
+        class="icon-btn danger"
+        (click)="shareDialog.close()"
+      >
+        Cerrar
+      </button>
     </div>
   } @else {
-    <p class="share-note">Crea un enlace para invitar a gente a este tablero.</p>
+    <p class="share-note">
+      Crea un enlace para invitar a gente a este tablero.
+    </p>
     <div class="dialog-actions">
-      <button type="button" class="btn btn-primary" (click)="createInvite()">Crear enlace de invitación</button>
-      <button type="button" class="icon-btn danger" (click)="shareDialog.close()">Cerrar</button>
+      <button type="button" class="btn btn-primary" (click)="createInvite()">
+        Crear enlace de invitación
+      </button>
+      <button
+        type="button"
+        class="icon-btn danger"
+        (click)="shareDialog.close()"
+      >
+        Cerrar
+      </button>
     </div>
   }
 </dialog>

@@ -1,7 +1,9 @@
 import { expect, test } from '@playwright/test';
 import { PASSWORD, login, register, uniqueEmail } from './helpers';
 
-test('a registered user can log in and reach the dashboard', async ({ page }) => {
+test('a registered user can log in and reach the dashboard', async ({
+  page,
+}) => {
   const email = uniqueEmail('login');
   await register(page, email);
 
@@ -16,7 +18,9 @@ test('a registered user can log in and reach the dashboard', async ({ page }) =>
   await expect(page.getByTestId('current-user')).toHaveText('Test Driver');
 });
 
-test('the session survives a page reload via the refresh cookie', async ({ page }) => {
+test('the session survives a page reload via the refresh cookie', async ({
+  page,
+}) => {
   await register(page, uniqueEmail('reload'));
 
   // The access token only lives in memory, so this proves the refresh cookie works.
@@ -34,7 +38,9 @@ test('logging in with a wrong password shows an error and stays on the login pag
   await page.getByLabel('Contraseña').fill(`wrong-${PASSWORD}`);
   await page.getByRole('button', { name: 'Iniciar sesión' }).click();
 
-  await expect(page.getByRole('alert')).toHaveText('Correo o contraseña incorrectos');
+  await expect(page.getByRole('alert')).toHaveText(
+    'Correo o contraseña incorrectos',
+  );
   await expect(page).toHaveURL(/\/login$/);
 });
 

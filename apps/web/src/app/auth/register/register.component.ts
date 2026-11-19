@@ -1,4 +1,9 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  inject,
+  signal,
+} from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../auth.service';
@@ -21,8 +26,14 @@ export class RegisterComponent {
   readonly form = inject(FormBuilder).nonNullable.group({
     firstName: ['', [Validators.required, Validators.maxLength(30)]],
     lastName: ['', [Validators.required, Validators.maxLength(30)]],
-    email: ['', [Validators.required, Validators.email, Validators.maxLength(254)]],
-    password: ['', [Validators.required, Validators.minLength(8), Validators.maxLength(128)]],
+    email: [
+      '',
+      [Validators.required, Validators.email, Validators.maxLength(254)],
+    ],
+    password: [
+      '',
+      [Validators.required, Validators.minLength(8), Validators.maxLength(128)],
+    ],
   });
 
   submit(): void {
@@ -35,11 +46,17 @@ export class RegisterComponent {
       next: () => {
         // Only in-app paths: a returnUrl like '//evil.com' must never leave the site.
         const back = this.route.snapshot.queryParamMap.get('returnUrl');
-        void this.router.navigateByUrl(back?.startsWith('/') && !back.startsWith('//') ? back : '/home');
+        void this.router.navigateByUrl(
+          back?.startsWith('/') && !back.startsWith('//') ? back : '/home',
+        );
       },
       error: (err) => {
         this.pending.set(false);
-        this.error.set(err.status === 409 ? 'Ese correo ya está registrado' : 'No se pudo crear la cuenta');
+        this.error.set(
+          err.status === 409
+            ? 'Ese correo ya está registrado'
+            : 'No se pudo crear la cuenta',
+        );
       },
     });
   }

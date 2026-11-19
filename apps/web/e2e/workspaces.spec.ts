@@ -1,7 +1,10 @@
 import { expect, test } from '@playwright/test';
 import { register, uniqueEmail } from './helpers';
 
-test('a workspace invite link gives access to every board in it', async ({ page, browser }) => {
+test('a workspace invite link gives access to every board in it', async ({
+  page,
+  browser,
+}) => {
   await register(page, uniqueEmail('ws-owner'));
 
   // Create the workspace and a board in it from the Boards page.
@@ -16,14 +19,20 @@ test('a workspace invite link gives access to every board in it', async ({ page,
   await expect(software.getByRole('link', { name: 'Backend' })).toBeVisible();
 
   await software.getByRole('button', { name: 'Miembros' }).click();
-  await page.getByRole('button', { name: 'Crear enlace de invitación' }).click();
-  const link = await page.getByLabel('Enlace de invitación al espacio de trabajo').inputValue();
+  await page
+    .getByRole('button', { name: 'Crear enlace de invitación' })
+    .click();
+  const link = await page
+    .getByLabel('Enlace de invitación al espacio de trabajo')
+    .inputValue();
 
   const guestContext = await browser.newContext();
   const guest = await guestContext.newPage();
   await register(guest, uniqueEmail('ws-guest'), 'Guest Driver');
   await guest.goto(new URL(link).pathname);
-  await guest.getByRole('button', { name: 'Unirse al espacio de trabajo' }).click();
+  await guest
+    .getByRole('button', { name: 'Unirse al espacio de trabajo' })
+    .click();
   await expect(guest).toHaveURL(/\/w\//);
 
   await guest.getByRole('link', { name: 'Backend' }).click();

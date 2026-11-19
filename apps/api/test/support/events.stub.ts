@@ -1,6 +1,10 @@
+import { Logger } from '@nestjs/common';
 import { vi } from 'vitest';
 import { firstValueFrom, take, toArray } from 'rxjs';
-import type { EventsService, StreamMessage } from '../../src/events/events.service.js';
+import type {
+  EventsService,
+  StreamMessage,
+} from '../../src/events/events.service.js';
 
 /** Minimal prisma stub: enough for record() and the membership lookup, nothing more. */
 export function stubPrisma(boardIds: string[]) {
@@ -33,6 +37,8 @@ export function stubFailingPrisma(boardIds: string[]) {
   prisma.event.create = vi.fn(async () => {
     throw new Error('database is down');
   });
+  // The failure is expected: keep it out of the test output.
+  vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
   return prisma;
 }
 
@@ -41,8 +47,14 @@ export function stubFailingPrisma(boardIds: string[]) {
  * membership lookup has settled, so anything recorded afterwards is seen by the stream.
  * The messages are behind `received` so awaiting this does not wait for them.
  */
-export async function subscribe(service: EventsService, userId: string, count: number) {
-  const received: Promise<StreamMessage[]> = firstValueFrom(service.streamFor(userId).pipe(take(count), toArray()));
+export async function subscribe(
+  service: EventsService,
+  userId: string,
+  count: number,
+) {
+  const received: Promise<StreamMessage[]> = firstValueFrom(
+    service.streamFor(userId).pipe(take(count), toArray()),
+  );
   await new Promise((resolve) => setTimeout(resolve));
   return { received };
 }

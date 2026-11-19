@@ -17,9 +17,25 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
-import { AuthService, JWT_ALGORITHM, REFRESH_TOKEN_TTL_MS } from './auth.service.js';
-import { parseCredentials, parseDisplayName, parsePasswordChange, parseRegisterName } from './dto.js';
-import { authorizeUrl, exchangeCode, microsoftConfig, newOAuthState, validateClaims, type OAuthState } from './microsoft.js';
+import {
+  AuthService,
+  JWT_ALGORITHM,
+  REFRESH_TOKEN_TTL_MS,
+} from './auth.service.js';
+import {
+  parseCredentials,
+  parseDisplayName,
+  parsePasswordChange,
+  parseRegisterName,
+} from './dto.js';
+import {
+  authorizeUrl,
+  exchangeCode,
+  microsoftConfig,
+  newOAuthState,
+  validateClaims,
+  type OAuthState,
+} from './microsoft.js';
 import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
 import { EmailThrottlerGuard } from './guards/email-throttler.guard.js';
 import { CurrentUser } from './decorators/current-user.decorator.js';
@@ -38,7 +54,9 @@ const OAUTH_TTL_MS = 10 * 60 * 1000;
 // the global limit. Env-configurable because a rate limit is deployment policy, not
 // application logic: the e2e suite registers a dozen accounts in seconds from one IP,
 // which is exactly the traffic this is meant to stop in production.
-const AUTH_LIMIT = { default: { ttl: 60_000, limit: Number(process.env.AUTH_RATE_LIMIT ?? 10) } };
+const AUTH_LIMIT = {
+  default: { ttl: 60_000, limit: Number(process.env.AUTH_RATE_LIMIT ?? 10) },
+};
 
 // Refresh is not a guessing surface — it needs an unforgeable signed cookie we issued —
 // and every page load spends one. At the credential limit, a user with a handful of tabs
@@ -66,7 +84,10 @@ export class AuthController {
   async microsoftStart(@Res() res: Response) {
     if (!MICROSOFT) throw new NotFoundException();
     const state = newOAuthState();
-    const signed = await this.jwt.signAsync({ ...state }, { expiresIn: OAUTH_TTL_MS / 1000, audience: OAUTH_AUDIENCE });
+    const signed = await this.jwt.signAsync(
+      { ...state },
+      { expiresIn: OAUTH_TTL_MS / 1000, audience: OAUTH_AUDIENCE },
+    );
     res.cookie(OAUTH_COOKIE, signed, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -91,20 +112,29 @@ export class AuthController {
     const web = process.env.WEB_ORIGIN;
     res.clearCookie(OAUTH_COOKIE, { path: '/auth/microsoft' });
     try {
-      const saved = await this.jwt.verifyAsync<OAuthState>(req.cookies?.[OAUTH_COOKIE] ?? '', {
-        audience: OAUTH_AUDIENCE,
-        algorithms: [JWT_ALGORITHM],
-      });
+      const saved = await this.jwt.verifyAsync<OAuthState>(
+        req.cookies?.[OAUTH_COOKIE] ?? '',
+        {
+          audience: OAUTH_AUDIENCE,
+          algorithms: [JWT_ALGORITHM],
+        },
+      );
       // Also covers ?error=... (user cancelled, consent denied): no code comes back.
-      if (!code || state !== saved.state) throw new Error('State mismatch or no code');
-      const identity = validateClaims(await exchangeCode(MICROSOFT, code, saved.verifier), MICROSOFT, saved.nonce);
+      if (!code || state !== saved.state)
+        throw new Error('State mismatch or no code');
+      const identity = validateClaims(
+        await exchangeCode(MICROSOFT, code, saved.verifier),
+        MICROSOFT,
+        saved.nonce,
+      );
       const result = await this.auth.signInWithMicrosoft(identity);
       this.setRefreshCookie(res, result.refreshToken);
       // The app picks the session up from the refresh cookie on load, like any page reload.
       res.redirect(`${web}/home`);
     } catch (error) {
       this.logger.warn(`Microsoft sign-in failed: ${(error as Error).message}`);
-      const reason = error instanceof ConflictException ? 'microsoft-linked' : 'microsoft';
+      const reason =
+        error instanceof ConflictException ? 'microsoft-linked' : 'microsoft';
       res.redirect(`${web}/login?error=${reason}`);
     }
   }
@@ -113,15 +143,27 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Post('password')
   @HttpCode(204)
-  async changePassword(@CurrentUser() user: JwtPayload, @Body() body: unknown, @Req() req: Request) {
+  async changePassword(
+    @CurrentUser() user: JwtPayload,
+    @Body() body: unknown,
+    @Req() req: Request,
+  ) {
     const { current, next } = parsePasswordChange(body);
-    await this.auth.changePassword(user.sub, current, next, req.cookies?.[REFRESH_COOKIE]);
+    await this.auth.changePassword(
+      user.sub,
+      current,
+      next,
+      req.cookies?.[REFRESH_COOKIE],
+    );
   }
 
   @Throttle(AUTH_LIMIT)
   @UseGuards(EmailThrottlerGuard)
   @Post('register')
-  async register(@Body() body: unknown, @Res({ passthrough: true }) res: Response) {
+  async register(
+    @Body() body: unknown,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     // With Microsoft on, accounts come from the company directory: an unverified self-registered
     // email would otherwise sit waiting for its real owner's first Microsoft sign-in.
     if (MICROSOFT) throw new NotFoundException();
@@ -135,7 +177,10 @@ export class AuthController {
   @Throttle(AUTH_LIMIT)
   @UseGuards(EmailThrottlerGuard)
   @Post('login')
-  async login(@Body() body: unknown, @Res({ passthrough: true }) res: Response) {
+  async login(
+    @Body() body: unknown,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const { email, password } = parseCredentials(body);
     const result = await this.auth.login(email, password);
     this.setRefreshCookie(res, result.refreshToken);
@@ -144,7 +189,10 @@ export class AuthController {
 
   @Throttle(REFRESH_LIMIT)
   @Post('refresh')
-  async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+  async refresh(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const refreshToken = req.cookies?.[REFRESH_COOKIE];
     if (!refreshToken) throw new UnauthorizedException('Missing refresh token');
 

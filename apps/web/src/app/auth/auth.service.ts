@@ -1,6 +1,14 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, of, tap, map, finalize, shareReplay, catchError } from 'rxjs';
+import {
+  Observable,
+  of,
+  tap,
+  map,
+  finalize,
+  shareReplay,
+  catchError,
+} from 'rxjs';
 
 export type Role = 'ADMIN' | 'MANAGER' | 'DEVELOPER';
 
@@ -52,7 +60,11 @@ export class AuthService {
 
   login(email: string, password: string): Observable<AuthResponse> {
     return this.http
-      .post<AuthResponse>('/auth/login', { email, password }, { withCredentials: true })
+      .post<AuthResponse>(
+        '/auth/login',
+        { email, password },
+        { withCredentials: true },
+      )
       .pipe(tap((res) => this.setSession(res)));
   }
 
@@ -95,8 +107,15 @@ export class AuthService {
   }
 
   /** Signs out every other device; this one stays signed in. */
-  changePassword(currentPassword: string, newPassword: string): Observable<unknown> {
-    return this.http.post('/auth/password', { currentPassword, newPassword }, { withCredentials: true });
+  changePassword(
+    currentPassword: string,
+    newPassword: string,
+  ): Observable<unknown> {
+    return this.http.post(
+      '/auth/password',
+      { currentPassword, newPassword },
+      { withCredentials: true },
+    );
   }
 
   clearSession(): void {

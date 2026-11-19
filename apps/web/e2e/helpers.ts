@@ -12,7 +12,11 @@ export function uniqueEmail(tag: string): string {
 export const PASSWORD = 'e2e-password-123';
 
 /** `name` is "First Last": the member picker shows people by name, so tests pick by it. */
-export async function register(page: Page, email: string, name = 'Test Driver'): Promise<void> {
+export async function register(
+  page: Page,
+  email: string,
+  name = 'Test Driver',
+): Promise<void> {
   const [first, last] = name.split(' ');
   await page.goto('/register');
   await page.locator('#firstName').fill(first);
@@ -33,7 +37,9 @@ export async function login(page: Page, email: string): Promise<void> {
 
 /** Creates a board from the header's Create dialog, which opens it. Returns its id from the URL. */
 export async function createBoard(page: Page, title: string): Promise<string> {
-  await page.getByRole('button', { name: 'Crear tablero', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Crear tablero', exact: true })
+    .click();
   await page.getByLabel('Título del tablero').fill(title);
   await page.getByRole('button', { name: 'Crear', exact: true }).click();
   await expect(page).toHaveURL(/\/boards\/[^/]+$/);
@@ -51,10 +57,16 @@ export async function addList(page: Page, title: string): Promise<void> {
 }
 
 export function listColumn(page: Page, title: string) {
-  return page.locator('.list-col').filter({ has: page.getByRole('heading', { name: title }) });
+  return page
+    .locator('.list-col')
+    .filter({ has: page.getByRole('heading', { name: title }) });
 }
 
-export async function addCard(page: Page, listTitle: string, cardTitle: string): Promise<void> {
+export async function addCard(
+  page: Page,
+  listTitle: string,
+  cardTitle: string,
+): Promise<void> {
   const column = listColumn(page, listTitle);
   const trigger = column.getByRole('button', { name: '+ Añadir una tarjeta' });
   if (await trigger.isVisible()) await trigger.click();
@@ -68,7 +80,11 @@ export async function addCard(page: Page, listTitle: string, cardTitle: string):
  * the target to produce the intermediate move events it listens for. Resolves once the
  * move has been saved.
  */
-export async function dragCardTo(page: Page, cardTitle: string, targetListTitle: string) {
+export async function dragCardTo(
+  page: Page,
+  cardTitle: string,
+  targetListTitle: string,
+) {
   const card = page.locator('.card').filter({ hasText: cardTitle }).first();
   const target = listColumn(page, targetListTitle).locator('.card-drop');
 
@@ -77,7 +93,9 @@ export async function dragCardTo(page: Page, cardTitle: string, targetListTitle:
   if (!from || !to) throw new Error('Card or target list is not visible');
 
   // Armed before the drop and awaited after it: reloading before the PATCH lands aborts the save.
-  const saved = page.waitForResponse((r) => r.request().method() === 'PATCH' && r.url().includes('/cards/'));
+  const saved = page.waitForResponse(
+    (r) => r.request().method() === 'PATCH' && r.url().includes('/cards/'),
+  );
   await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
   await page.mouse.down();
   for (let step = 1; step <= 8; step++) {
@@ -91,9 +109,15 @@ export async function dragCardTo(page: Page, cardTitle: string, targetListTitle:
 }
 
 /** Opens the board's invite link and joins as a second, freshly registered user. */
-export async function inviteSecondUser(owner: Page, browser: Browser, email: string) {
+export async function inviteSecondUser(
+  owner: Page,
+  browser: Browser,
+  email: string,
+) {
   await owner.getByRole('button', { name: 'Compartir' }).click();
-  await owner.getByRole('button', { name: 'Crear enlace de invitación' }).click();
+  await owner
+    .getByRole('button', { name: 'Crear enlace de invitación' })
+    .click();
   const link = await owner.getByLabel('Enlace de invitación').inputValue();
   await owner.getByRole('button', { name: 'Cerrar' }).click();
 

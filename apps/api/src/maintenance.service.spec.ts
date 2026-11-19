@@ -18,7 +18,9 @@ describe('MaintenanceService.sweepUploads', () => {
       board: { findMany: async () => [{ background: '/uploads/bg.png' }] },
       list: { findMany: async () => [] },
     };
-    const removed = await new MaintenanceService(prisma as never).sweepUploads(Date.now());
+    const removed = await new MaintenanceService(prisma as never).sweepUploads(
+      Date.now(),
+    );
 
     expect(removed).toBe(1);
     expect(existsSync(join(dir, 'orphan.png'))).toBe(false);

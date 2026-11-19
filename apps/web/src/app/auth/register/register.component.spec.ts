@@ -1,7 +1,10 @@
 import { Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
-import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import {
+  HttpTestingController,
+  provideHttpClientTesting,
+} from '@angular/common/http/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RegisterComponent } from './register.component';
 
@@ -37,7 +40,12 @@ describe('RegisterComponent', () => {
     fixture.componentInstance.submit();
     httpMock.expectOne('/auth/register').flush({
       accessToken: 'token-1',
-      user: { sub: '1', email: 'dev@sprintio.test', role: 'DEVELOPER', displayName: 'Ada Lovelace' },
+      user: {
+        sub: '1',
+        email: 'dev@sprintio.test',
+        role: 'DEVELOPER',
+        displayName: 'Ada Lovelace',
+      },
     });
 
     await fixture.whenStable();
@@ -46,10 +54,13 @@ describe('RegisterComponent', () => {
 
   it('tells the user when the email is already registered', async () => {
     fixture.componentInstance.submit();
-    httpMock.expectOne('/auth/register').flush(null, { status: 409, statusText: 'Conflict' });
+    httpMock
+      .expectOne('/auth/register')
+      .flush(null, { status: 409, statusText: 'Conflict' });
 
     fixture.detectChanges();
-    const alert: HTMLElement = fixture.nativeElement.querySelector('[role="alert"]');
+    const alert: HTMLElement =
+      fixture.nativeElement.querySelector('[role="alert"]');
     expect(alert.textContent).toContain('Ese correo ya está registrado');
   });
 });

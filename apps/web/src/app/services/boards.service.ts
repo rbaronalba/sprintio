@@ -118,11 +118,16 @@ export class BoardsService {
   }
 
   previewWorkspaceInvite(token: string): Observable<WorkspaceInvitePreview> {
-    return this.http.get<WorkspaceInvitePreview>(`/workspaces/join/${encodeURIComponent(token)}`);
+    return this.http.get<WorkspaceInvitePreview>(
+      `/workspaces/join/${encodeURIComponent(token)}`,
+    );
   }
 
   joinWorkspace(token: string): Observable<{ workspaceId: string }> {
-    return this.http.post<{ workspaceId: string }>(`/workspaces/join/${encodeURIComponent(token)}`, {});
+    return this.http.post<{ workspaceId: string }>(
+      `/workspaces/join/${encodeURIComponent(token)}`,
+      {},
+    );
   }
 
   workspaceMembers(id: string): Observable<Member[]> {
@@ -153,12 +158,20 @@ export class BoardsService {
   }
 
   setStarred(id: string, starred: boolean): Observable<{ starred: boolean }> {
-    return this.http.put<{ starred: boolean }>(`/boards/${id}/star`, { starred });
+    return this.http.put<{ starred: boolean }>(`/boards/${id}/star`, {
+      starred,
+    });
   }
 
   /** A File uploads an image; a string sets a palette color, or '' clears it. */
-  setBackground(id: string, value: string | File): Observable<{ background: string }> {
-    return this.http.post<{ background: string }>(`/boards/${id}/background`, backgroundBody(value));
+  setBackground(
+    id: string,
+    value: string | File,
+  ): Observable<{ background: string }> {
+    return this.http.post<{ background: string }>(
+      `/boards/${id}/background`,
+      backgroundBody(value),
+    );
   }
 
   createInvite(id: string): Observable<{ token: string }> {
@@ -170,11 +183,16 @@ export class BoardsService {
   }
 
   previewInvite(token: string): Observable<InvitePreview> {
-    return this.http.get<InvitePreview>(`/boards/join/${encodeURIComponent(token)}`);
+    return this.http.get<InvitePreview>(
+      `/boards/join/${encodeURIComponent(token)}`,
+    );
   }
 
   join(token: string): Observable<{ boardId: string }> {
-    return this.http.post<{ boardId: string }>(`/boards/join/${encodeURIComponent(token)}`, {});
+    return this.http.post<{ boardId: string }>(
+      `/boards/join/${encodeURIComponent(token)}`,
+      {},
+    );
   }
 
   /** Owner removing someone, or anyone passing their own id to leave. */
@@ -194,7 +212,9 @@ export class BoardsService {
   search(term: string): Observable<SearchHit[]> {
     // The API needs two characters to match; skip the round trip below that.
     if (term.trim().length < 2) return of([]);
-    return this.http.get<SearchHit[]>('/search', { params: { q: term.trim() } });
+    return this.http.get<SearchHit[]>('/search', {
+      params: { q: term.trim() },
+    });
   }
 
   listActivity(boardId: string): Observable<ActivityEntry[]> {

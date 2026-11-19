@@ -68,7 +68,55 @@ interface BusMessage {
 }
 
 /** What a subscriber actually receives: the bus message minus the recipient list. */
-export type StreamMessage = Omit<BusMessage, 'recipients'> & { notified: boolean };
+export type StreamMessage = Omit<BusMessage, 'recipients'> & {
+  notified: boolean;
+};
+
+type StoredEvent = {
+  id: string;
+  boardId: string;
+  cardId: string | null;
+  actorId: string;
+  data: unknown;
+  createdAt: Date;
+  actor: { email: string; displayName: string | null };
+};
+
+/** A transient event: pushed to open boards, never stored or shown in a feed. */
+function liveMessage(input: RecordInput, clientId: string | null): BusMessage {
+  return {
+    id: randomUUID(),
+    type: input.type,
+    boardId: input.boardId,
+    cardId: input.cardId ?? null,
+    actorId: input.actorId,
+    actorEmail: '',
+    data: input.data ?? {},
+    createdAt: new Date().toISOString(),
+    recipients: [],
+    clientId,
+  };
+}
+
+function storedMessage(
+  event: StoredEvent,
+  type: RecordInput['type'],
+  recipients: string[],
+  clientId: string | null,
+): BusMessage {
+  return {
+    id: event.id,
+    type,
+    boardId: event.boardId,
+    cardId: event.cardId,
+    actorId: event.actorId,
+    actorEmail: event.actor.email,
+    data: (event.data ?? {}) as Record<string, unknown>,
+    createdAt: event.createdAt.toISOString(),
+    recipients,
+    clientId,
+  };
+}
 
 @Injectable()
 export class EventsService {
@@ -78,7 +126,9 @@ export class EventsService {
 
   constructor(
     private readonly prisma: PrismaService,
-    @Optional() @Inject(REDIS) private readonly redis: RedisClients | null = null,
+    @Optional()
+    @Inject(REDIS)
+    private readonly redis: RedisClients | null = null,
   ) {
     if (!redis) return;
     void redis.sub.subscribe(CHANNEL);
@@ -88,7 +138,8 @@ export class EventsService {
   }
 
   private async publish(message: BusMessage): Promise<void> {
-    if (this.redis) await this.redis.cmd.publish(CHANNEL, JSON.stringify(message));
+    if (this.redis)
+      await this.redis.cmd.publish(CHANNEL, JSON.stringify(message));
     else this.bus.next(message);
   }
 
@@ -101,67 +152,72 @@ export class EventsService {
   async record(input: RecordInput): Promise<void> {
     const clientId = requestContext.getStore()?.clientId ?? null;
     try {
-      if (input.live) {
-        return await this.publish({
-          id: randomUUID(),
-          type: input.type,
-          boardId: input.boardId,
-          cardId: input.cardId ?? null,
-          actorId: input.actorId,
-          actorEmail: '',
-          data: input.data ?? {},
-          createdAt: new Date().toISOString(),
-          recipients: [],
-          clientId,
-        });
-      }
-      const event = await this.prisma.event.create({
-        data: {
-          type: input.type,
-          boardId: input.boardId,
-          cardId: input.cardId ?? null,
-          actorId: input.actorId,
-          data: (input.data ?? {}) as object,
-        },
-        include: { actor: { select: { email: true, displayName: true } } },
-      });
-
-      const recipients = [...new Set(input.notify ?? [])].filter((id) => id !== input.actorId);
-      if (recipients.length > 0) {
-        await this.prisma.notification.createMany({
-          data: recipients.map((userId) => ({ userId, eventId: event.id })),
-          skipDuplicates: true,
-        });
-        // Not awaited: a slow SMTP server must not slow the request that caused this.
-        const subject = mailSubject(input.type, event.actor.displayName || event.actor.email, input.data ?? {});
-        if (mailEnabled && subject) void this.email(recipients, subject, event.boardId, event.cardId);
-      }
-
-      await this.publish({
-        id: event.id,
-        type: input.type,
-        boardId: event.boardId,
-        cardId: event.cardId,
-        actorId: event.actorId,
-        actorEmail: event.actor.email,
-        data: (event.data ?? {}) as Record<string, unknown>,
-        createdAt: event.createdAt.toISOString(),
-        recipients,
-        clientId,
-      });
+      if (input.live) return await this.publish(liveMessage(input, clientId));
+      const event = await this.createEvent(input);
+      const recipients = await this.notifyRecipients(input, event);
+      await this.publish(
+        storedMessage(event, input.type, recipients, clientId),
+      );
     } catch (error) {
-      this.logger.error(`Failed to record ${input.type} on board ${input.boardId}`, error);
+      this.logger.error(
+        `Failed to record ${input.type} on board ${input.boardId}`,
+        error,
+      );
     }
   }
 
-  private async email(userIds: string[], subject: string, boardId: string, cardId: string | null): Promise<void> {
+  private createEvent(input: RecordInput) {
+    return this.prisma.event.create({
+      data: {
+        type: input.type,
+        boardId: input.boardId,
+        cardId: input.cardId ?? null,
+        actorId: input.actorId,
+        data: (input.data ?? {}) as object,
+      },
+      include: { actor: { select: { email: true, displayName: true } } },
+    });
+  }
+
+  /** Stores notifications and fires the emails; returns who was notified (never the actor). */
+  private async notifyRecipients(
+    input: RecordInput,
+    event: StoredEvent,
+  ): Promise<string[]> {
+    const recipients = [...new Set(input.notify ?? [])].filter(
+      (id) => id !== input.actorId,
+    );
+    if (recipients.length === 0) return recipients;
+    await this.prisma.notification.createMany({
+      data: recipients.map((userId) => ({ userId, eventId: event.id })),
+      skipDuplicates: true,
+    });
+    // Not awaited: a slow SMTP server must not slow the request that caused this.
+    const subject = mailSubject(
+      input.type,
+      event.actor.displayName || event.actor.email,
+      input.data ?? {},
+    );
+    if (mailEnabled && subject)
+      void this.email(recipients, subject, event.boardId, event.cardId);
+    return recipients;
+  }
+
+  private async email(
+    userIds: string[],
+    subject: string,
+    boardId: string,
+    cardId: string | null,
+  ): Promise<void> {
     try {
       const users = await this.prisma.user.findMany({
         where: { id: { in: userIds }, disabledAt: null },
         select: { email: true },
       });
       const link = `${process.env.WEB_ORIGIN}/boards/${boardId}${cardId ? `?card=${cardId}` : ''}`;
-      await Promise.all(users.map((u) => sendMail(u.email, subject, `${subject}\n\n${link}`)));
+      await Promise.all(
+        users.map((u) => sendMail(u.email, subject, `${subject}\n\n${link}`)),
+      );
     } catch (error) {
       this.logger.error(`Failed to email "${subject}"`, error);
     }
@@ -181,13 +237,22 @@ export class EventsService {
         const boards = new Set(ids);
         return this.bus.pipe(
           filter((message) => {
-            if (message.type === 'MEMBER_JOINED' && message.actorId === userId) {
+            if (
+              message.type === 'MEMBER_JOINED' &&
+              message.actorId === userId
+            ) {
               boards.add(message.boardId);
             }
-            if (message.type === 'BOARD_CREATED' && (message.data.userIds as string[] | undefined)?.includes(userId)) {
+            if (
+              message.type === 'BOARD_CREATED' &&
+              (message.data.userIds as string[] | undefined)?.includes(userId)
+            ) {
               boards.add(message.boardId);
             }
-            if (message.type === 'MEMBER_REMOVED' && message.data.userId === userId) {
+            if (
+              message.type === 'MEMBER_REMOVED' &&
+              message.data.userId === userId
+            ) {
               return boards.delete(message.boardId);
             }
             return boards.has(message.boardId);

@@ -10,23 +10,42 @@
     <p class="label-caps kicker">Invitación</p>
     <h1>Enlace no válido.</h1>
     <p class="lead">
-      Esta invitación se ha revocado, está completa o nunca existió. Pide un enlace nuevo al administrador.
+      Esta invitación se ha revocado, está completa o nunca existió. Pide un
+      enlace nuevo al administrador.
     </p>
     <a routerLink="/home" class="btn btn-outline">Ir a mis tableros</a>
   } @else if (invite(); as invite) {
     <p class="label-caps kicker">Te han invitado</p>
     <h1>{{ invite.title }}</h1>
     @if (invite.isMember) {
-      <p class="lead">Ya eres miembro de este {{ isWorkspace ? 'espacio de trabajo' : 'tablero' }}.</p>
-      <a [routerLink]="invite.link" class="btn btn-primary">Abrir {{ isWorkspace ? 'espacio de trabajo' : 'tablero' }}</a>
+      <p class="lead">
+        Ya eres miembro de este
+        {{ isWorkspace ? 'espacio de trabajo' : 'tablero' }}.
+      </p>
+      <a [routerLink]="invite.link" class="btn btn-primary"
+        >Abrir {{ isWorkspace ? 'espacio de trabajo' : 'tablero' }}</a
+      >
     } @else if (isWorkspace) {
-      <p class="lead">Únete para ser miembro de todos los tableros de este espacio de trabajo, los actuales y los futuros.</p>
-      <button type="button" class="btn btn-primary" [disabled]="pending()" (click)="join()">
+      <p class="lead">
+        Únete para ser miembro de todos los tableros de este espacio de trabajo,
+        los actuales y los futuros.
+      </p>
+      <button
+        type="button"
+        class="btn btn-primary"
+        [disabled]="pending()"
+        (click)="join()"
+      >
         Unirse al espacio de trabajo
       </button>
     } @else {
       <p class="lead">Únete para ver sus listas y asignarte tarjetas.</p>
-      <button type="button" class="btn btn-primary" [disabled]="pending()" (click)="join()">
+      <button
+        type="button"
+        class="btn btn-primary"
+        [disabled]="pending()"
+        (click)="join()"
+      >
         Unirse al tablero
       </button>
     }

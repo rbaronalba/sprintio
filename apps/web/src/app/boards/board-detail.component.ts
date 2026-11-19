@@ -1,4 +1,16 @@
-import { ChangeDetectionStrategy, Component, ElementRef, HostListener, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
+import { AutofocusDirective } from '../shared/autofocus.directive';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  HostListener,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+  viewChild,
+} from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
@@ -17,24 +29,67 @@ import { backgroundStyle } from '../shared/background';
 import { AuthService } from '../auth/auth.service';
 import { CLIENT_ID, RealtimeService } from '../realtime/realtime.service';
 import { actorName, describeEvent, relativeTime } from '../realtime/activity';
-import { ActivityEntry, ArchivedCard, Board, BoardDetail, BoardsService, Label, Member } from '../services/boards.service';
-import { Attachment, BoardService, COMMENT_PAGE, Card, ChecklistItem, Comment, List, Moved, TimeEntry } from '../services/board.service';
+import {
+  ActivityEntry,
+  ArchivedCard,
+  Board,
+  BoardDetail,
+  BoardsService,
+  Label,
+  Member,
+} from '../services/boards.service';
+import {
+  Attachment,
+  BoardService,
+  COMMENT_PAGE,
+  Card,
+  ChecklistItem,
+  Comment,
+  List,
+  Moved,
+  TimeEntry,
+} from '../services/board.service';
 import { RichEditorComponent, RichPipe } from '../shared/rich-text';
 
 // Mirrors the fixed palette the API accepts (apps/api/src/boards/dto.ts): 5 columns x 6 rows.
 export const LABEL_COLORS = [
-  '#baf3db', '#f8e6a0', '#fedec8', '#ffd5d2', '#dfd8fd',
-  '#4bce97', '#f5cd47', '#fea362', '#f87168', '#9f8fef',
-  '#1f845a', '#946f00', '#c25100', '#c9372c', '#6e5dc6',
-  '#cce0ff', '#c6edfb', '#d3f1a7', '#fdd0ec', '#dcdfe4',
-  '#579dff', '#6cc3e0', '#94c748', '#e774bb', '#8590a2',
-  '#0c66e4', '#227d9b', '#5b7f24', '#ae4787', '#626f86',
+  '#baf3db',
+  '#f8e6a0',
+  '#fedec8',
+  '#ffd5d2',
+  '#dfd8fd',
+  '#4bce97',
+  '#f5cd47',
+  '#fea362',
+  '#f87168',
+  '#9f8fef',
+  '#1f845a',
+  '#946f00',
+  '#c25100',
+  '#c9372c',
+  '#6e5dc6',
+  '#cce0ff',
+  '#c6edfb',
+  '#d3f1a7',
+  '#fdd0ec',
+  '#dcdfe4',
+  '#579dff',
+  '#6cc3e0',
+  '#94c748',
+  '#e774bb',
+  '#8590a2',
+  '#0c66e4',
+  '#227d9b',
+  '#5b7f24',
+  '#ae4787',
+  '#626f86',
 ];
 
 @Component({
   selector: 'app-board-detail',
   imports: [
     AppHeaderComponent,
+    AutofocusDirective,
     CdkDropList,
     CdkDrag,
     CdkDragHandle,
@@ -58,16 +113,20 @@ export class BoardDetailComponent {
   readonly actorName = actorName;
   readonly relativeTime = relativeTime;
 
-  readonly boardId = this.route.snapshot.paramMap.get('id')!;
+  readonly boardId = this.route.snapshot.paramMap.get('id') ?? '';
   readonly lists = signal<List[]>([]);
   readonly board = signal<BoardDetail | null>(null);
   readonly members = computed(() => this.board()?.members ?? []);
   readonly labels = computed(() => this.board()?.labels ?? []);
   /** For card faces: each card walks its own few labels instead of every label on the board. */
-  readonly labelById = computed(() => new Map(this.labels().map((l) => [l.id, l])));
+  readonly labelById = computed(
+    () => new Map(this.labels().map((l) => [l.id, l])),
+  );
   // Header avatars: four faces, then one "+N" button that opens the full member list.
   readonly shownMembers = computed(() => this.members().slice(0, 4));
-  readonly hiddenMembers = computed(() => Math.max(0, this.members().length - 4));
+  readonly hiddenMembers = computed(() =>
+    Math.max(0, this.members().length - 4),
+  );
   readonly boardsOpen = signal(false);
   readonly filterOpen = signal(false);
   readonly bgOpen = signal(false);
@@ -111,23 +170,40 @@ export class BoardDetailComponent {
   });
   readonly popoverCardId = signal<string | null>(null);
   readonly popoverCard = computed(
-    () => this.lists().flatMap((l) => l.cards).find((c) => c.id === this.popoverCardId()) ?? null,
+    () =>
+      this.lists()
+        .flatMap((l) => l.cards)
+        .find((c) => c.id === this.popoverCardId()) ?? null,
   );
-  private readonly memberPop = viewChild.required<ElementRef<HTMLElement>>('memberPop');
-  private readonly memberPopModal = viewChild.required<ElementRef<HTMLElement>>('memberPopModal');
-  private readonly labelPop = viewChild.required<ElementRef<HTMLElement>>('labelPop');
-  private readonly shareDialog = viewChild.required<ElementRef<HTMLDialogElement>>('shareDialog');
+  private readonly memberPop =
+    viewChild.required<ElementRef<HTMLElement>>('memberPop');
+  private readonly memberPopModal =
+    viewChild.required<ElementRef<HTMLElement>>('memberPopModal');
+  private readonly labelPop =
+    viewChild.required<ElementRef<HTMLElement>>('labelPop');
+  private readonly shareDialog =
+    viewChild.required<ElementRef<HTMLDialogElement>>('shareDialog');
   readonly addingIn = signal<string | null>(null);
   readonly addingList = signal(false);
   readonly renaming = signal<string | null>(null);
   readonly editing = signal<Card | null>(null);
   readonly editingTitle = signal(false);
   readonly archived = signal<ArchivedCard[]>([]);
-  private readonly dialog = viewChild.required<ElementRef<HTMLDialogElement>>('cardDialog');
-  private readonly descField = viewChild('descField', { read: RichEditorComponent });
+  private readonly dialog =
+    viewChild.required<ElementRef<HTMLDialogElement>>('cardDialog');
+  private readonly descField = viewChild('descField', {
+    read: RichEditorComponent,
+  });
   /** `verb` replaces "delete" for actions that can be undone (removing a member, leaving). */
-  readonly pendingDelete = signal<{ name: string; note?: string; verb?: string; label?: string; run: () => void } | null>(null);
-  private readonly confirmDialog = viewChild.required<ElementRef<HTMLDialogElement>>('confirmDialog');
+  readonly pendingDelete = signal<{
+    name: string;
+    note?: string;
+    verb?: string;
+    label?: string;
+    run: () => void;
+  } | null>(null);
+  private readonly confirmDialog =
+    viewChild.required<ElementRef<HTMLDialogElement>>('confirmDialog');
   private dragging = false;
   /** A remote change that arrived mid-drag, replayed once the drag finishes. */
   private refreshQueued = false;
@@ -145,7 +221,8 @@ export class BoardDetailComponent {
   toggleBoards(): void {
     this.filterOpen.set(false);
     this.boardsOpen.update((open) => !open);
-    if (this.boardsOpen()) this.boardsApi.list().subscribe((b) => this.allBoards.set(b));
+    if (this.boardsOpen())
+      this.boardsApi.list().subscribe((b) => this.allBoards.set(b));
   }
 
   /** Owner only. Saves on Enter/blur; an empty or unchanged title just closes the input. */
@@ -157,7 +234,8 @@ export class BoardDetailComponent {
     if (!board || !title || title === board.title) return;
     this.board.set({ ...board, title });
     this.boardsApi.rename(board.id, title).subscribe({
-      error: () => this.board.update((b) => (b ? { ...b, title: board.title } : b)),
+      error: () =>
+        this.board.update((b) => (b ? { ...b, title: board.title } : b)),
     });
   }
 
@@ -165,9 +243,13 @@ export class BoardDetailComponent {
   setBackground(list: List | null, value: string | File): void {
     const apply = (background: string) =>
       list
-        ? this.lists.update((ls) => ls.map((l) => (l.id === list.id ? { ...l, background } : l)))
+        ? this.lists.update((ls) =>
+            ls.map((l) => (l.id === list.id ? { ...l, background } : l)),
+          )
         : this.board.update((b) => (b ? { ...b, background } : b));
-    const req = list ? this.api.setListBackground(list.id, value) : this.boardsApi.setBackground(this.boardId, value);
+    const req = list
+      ? this.api.setListBackground(list.id, value)
+      : this.boardsApi.setBackground(this.boardId, value);
     req.subscribe(({ background }) => apply(background));
   }
 
@@ -188,7 +270,8 @@ export class BoardDetailComponent {
     const starred = !board.starred;
     this.board.set({ ...board, starred });
     this.boardsApi.setStarred(board.id, starred).subscribe({
-      error: () => this.board.update((b) => (b ? { ...b, starred: !starred } : b)),
+      error: () =>
+        this.board.update((b) => (b ? { ...b, starred: !starred } : b)),
     });
   }
 
@@ -223,7 +306,8 @@ export class BoardDetailComponent {
     this.boardsApi.get(this.boardId).subscribe({
       next: (board) => this.board.set(board),
       // Missing or not a member: same 404 as a bad URL, keeping the URL the user typed.
-      error: () => void this.router.navigate(['/404'], { skipLocationChange: true }),
+      error: () =>
+        void this.router.navigate(['/404'], { skipLocationChange: true }),
     });
 
     // Navigating from a notification to a card on the board we are already viewing
@@ -232,36 +316,7 @@ export class BoardDetailComponent {
       .pipe(takeUntilDestroyed())
       .subscribe(() => this.openCardFromQuery());
 
-    this.realtime.events
-      .pipe(
-        // Our own actions are already applied optimistically; replaying them would
-        // undo whatever the user typed in the meantime.
-        filter((message) => message.boardId === this.boardId && message.clientId !== CLIENT_ID),
-        takeUntilDestroyed(),
-      )
-      .subscribe((message) => {
-        if (message.type === 'MEMBER_REMOVED' && message.data['userId'] === this.currentUserId) {
-          void this.router.navigate(['/home']);
-          return;
-        }
-        if (message.type.startsWith('MEMBER_') || ['BACKGROUND_CHANGED', 'BOARD_RENAMED', 'OWNER_CHANGED'].includes(message.type)) {
-          this.boardsApi.get(this.boardId).subscribe((board) => this.board.set(board));
-        }
-        // Card-level events (the vast majority) re-fetch just that card. List and board
-        // level ones are rare and change the shape of the board, so those reload it all.
-        if (message.type === 'CARD_DELETED' && message.cardId) {
-          this.removeCardLocally(message.cardId);
-        } else if (message.cardId) {
-          this.staleCardIds.add(message.cardId);
-          this.remoteCardChange.next();
-        } else {
-          this.remoteChange.next();
-        }
-        // Refresh the open card's own panes too, so a comment from someone else
-        // shows up without closing and reopening the modal.
-        const open = this.editing();
-        if (open && message.cardId === open.id) this.loadCardPanes(open.id);
-      });
+    this.listenToRealtime();
 
     this.remoteChange
       .pipe(debounceTime(300), takeUntilDestroyed())
@@ -270,7 +325,68 @@ export class BoardDetailComponent {
       .pipe(debounceTime(300), takeUntilDestroyed())
       .subscribe(() => this.refreshStaleCards());
 
-    // Events sent while the stream was down are gone for good: resync once it is back.
+    this.resyncWhenReconnected();
+  }
+
+  private listenToRealtime(): void {
+    this.realtime.events
+      .pipe(
+        // Our own actions are already applied optimistically; replaying them would
+        // undo whatever the user typed in the meantime.
+        filter(
+          (message) =>
+            message.boardId === this.boardId && message.clientId !== CLIENT_ID,
+        ),
+        takeUntilDestroyed(),
+      )
+      .subscribe((message) => this.onRealtimeMessage(message));
+  }
+
+  private onRealtimeMessage(message: {
+    type: string;
+    cardId: string | null;
+    data: Record<string, unknown>;
+  }): void {
+    if (
+      message.type === 'MEMBER_REMOVED' &&
+      message.data['userId'] === this.currentUserId
+    ) {
+      void this.router.navigate(['/home']);
+      return;
+    }
+    if (this.changesBoardMeta(message.type)) {
+      this.boardsApi
+        .get(this.boardId)
+        .subscribe((board) => this.board.set(board));
+    }
+    this.scheduleSync(message);
+    // Refresh the open card's own panes too, so a comment from someone else
+    // shows up without closing and reopening the modal.
+    const open = this.editing();
+    if (open && message.cardId === open.id) this.loadCardPanes(open.id);
+  }
+
+  private changesBoardMeta(type: string): boolean {
+    return (
+      type.startsWith('MEMBER_') ||
+      ['BACKGROUND_CHANGED', 'BOARD_RENAMED', 'OWNER_CHANGED'].includes(type)
+    );
+  }
+
+  /** Card-level events (the vast majority) re-fetch just that card; list/board ones reload it all. */
+  private scheduleSync(message: { type: string; cardId: string | null }): void {
+    if (message.type === 'CARD_DELETED' && message.cardId) {
+      this.removeCardLocally(message.cardId);
+    } else if (message.cardId) {
+      this.staleCardIds.add(message.cardId);
+      this.remoteCardChange.next();
+    } else {
+      this.remoteChange.next();
+    }
+  }
+
+  /** Events sent while the stream was down are gone for good: resync once it is back. */
+  private resyncWhenReconnected(): void {
     let dropped = false;
     effect(() => {
       const connected = this.realtime.connected();
@@ -300,23 +416,33 @@ export class BoardDetailComponent {
   private applyRemoteCard(fresh: Card): void {
     if (fresh.archived) return this.removeCardLocally(fresh.id);
     // A list we have never seen (created remotely a moment ago): cheaper to reload than to guess.
-    if (!this.lists().some((l) => l.id === fresh.listId)) return this.refreshBoard();
+    if (!this.lists().some((l) => l.id === fresh.listId))
+      return this.refreshBoard();
     const { description: _, ...face } = fresh;
     this.lists.update((lists) =>
       lists.map((l) => {
         const cards = l.cards.filter((c) => c.id !== fresh.id);
-        if (l.id !== fresh.listId) return cards.length === l.cards.length ? l : { ...l, cards };
+        if (l.id !== fresh.listId)
+          return cards.length === l.cards.length ? l : { ...l, cards };
         cards.push(face);
-        return { ...l, cards: cards.sort((a, b) => a.position - b.position || (a.id < b.id ? -1 : 1)) };
+        return {
+          ...l,
+          cards: cards.sort(
+            (a, b) => a.position - b.position || (a.id < b.id ? -1 : 1),
+          ),
+        };
       }),
     );
     const open = this.editing();
     // Keep the description the modal already has; the face never carries it.
-    if (open?.id === fresh.id) this.editing.set({ ...face, description: open.description });
+    if (open?.id === fresh.id)
+      this.editing.set({ ...face, description: open.description });
   }
 
   private removeCardLocally(id: string): void {
-    this.lists.update((lists) => lists.map((l) => ({ ...l, cards: l.cards.filter((c) => c.id !== id) })));
+    this.lists.update((lists) =>
+      lists.map((l) => ({ ...l, cards: l.cards.filter((c) => c.id !== id) })),
+    );
     if (this.editing()?.id === id) this.dialog().nativeElement.close();
   }
 
@@ -339,18 +465,25 @@ export class BoardDetailComponent {
       // the fresh object, or close it if the card is gone.
       const open = this.editing();
       if (open) {
-        const fresh = lists.flatMap((l) => l.cards).find((c) => c.id === open.id);
-        if (fresh) this.editing.set({ ...fresh, description: open.description });
+        const fresh = lists
+          .flatMap((l) => l.cards)
+          .find((c) => c.id === open.id);
+        if (fresh)
+          this.editing.set({ ...fresh, description: open.description });
         else this.dialog().nativeElement.close();
       }
     });
-    this.boardsApi.get(this.boardId).subscribe({ next: (board) => this.board.set(board) });
+    this.boardsApi
+      .get(this.boardId)
+      .subscribe({ next: (board) => this.board.set(board) });
   }
 
   private openCardFromQuery(): void {
     const cardId = this.route.snapshot.queryParamMap.get('card');
     if (!cardId || this.editing()?.id === cardId) return;
-    const card = this.lists().flatMap((l) => l.cards).find((c) => c.id === cardId);
+    const card = this.lists()
+      .flatMap((l) => l.cards)
+      .find((c) => c.id === cardId);
     if (card) this.openCard(card);
   }
 
@@ -359,10 +492,18 @@ export class BoardDetailComponent {
       this.comments.set(comments);
       this.moreComments.set(comments.length === COMMENT_PAGE);
     });
-    this.api.listTimeEntries(cardId).subscribe((entries) => this.timeEntries.set(entries));
-    this.api.listAttachments(cardId).subscribe((attachments) => this.attachments.set(attachments));
-    this.api.listChecklist(cardId).subscribe((items) => this.checklist.set(items));
-    this.api.listActivity(cardId).subscribe((entries) => this.activity.set(entries));
+    this.api
+      .listTimeEntries(cardId)
+      .subscribe((entries) => this.timeEntries.set(entries));
+    this.api
+      .listAttachments(cardId)
+      .subscribe((attachments) => this.attachments.set(attachments));
+    this.api
+      .listChecklist(cardId)
+      .subscribe((items) => this.checklist.set(items));
+    this.api
+      .listActivity(cardId)
+      .subscribe((entries) => this.activity.set(entries));
   }
 
   addList(input: HTMLInputElement): void {
@@ -385,7 +526,9 @@ export class BoardDetailComponent {
     if (!title) return;
     this.api.createCard(list.id, title).subscribe((card) => {
       this.lists.update((lists) =>
-        lists.map((l) => (l.id === list.id ? { ...l, cards: [...l.cards, card] } : l)),
+        lists.map((l) =>
+          l.id === list.id ? { ...l, cards: [...l.cards, card] } : l,
+        ),
       );
       input.value = '';
     });
@@ -393,7 +536,12 @@ export class BoardDetailComponent {
 
   removeCard(cardId: string): void {
     this.api.removeCard(cardId).subscribe(() => {
-      this.lists.update((lists) => lists.map((l) => ({ ...l, cards: l.cards.filter((c) => c.id !== cardId) })));
+      this.lists.update((lists) =>
+        lists.map((l) => ({
+          ...l,
+          cards: l.cards.filter((c) => c.id !== cardId),
+        })),
+      );
     });
   }
 
@@ -403,7 +551,9 @@ export class BoardDetailComponent {
     this.lists.set(lists);
 
     const list = lists[event.currentIndex];
-    this.api.moveList(list.id, lists[event.currentIndex - 1]?.id ?? null).subscribe(this.afterMove(list));
+    this.api
+      .moveList(list.id, lists[event.currentIndex - 1]?.id ?? null)
+      .subscribe(this.afterMove(list));
   }
 
   dropCard(event: CdkDragDrop<Card[]>, targetList: List): void {
@@ -413,14 +563,21 @@ export class BoardDetailComponent {
     if (event.previousContainer === event.container) {
       moveItemInArray(targetCards, event.previousIndex, event.currentIndex);
     } else {
-      transferArrayItem(sourceCards, targetCards, event.previousIndex, event.currentIndex);
+      transferArrayItem(
+        sourceCards,
+        targetCards,
+        event.previousIndex,
+        event.currentIndex,
+      );
     }
     this.lists.update((lists) => [...lists]);
 
     const card = targetCards[event.currentIndex];
     card.listId = targetList.id;
     const afterId = targetCards[event.currentIndex - 1]?.id ?? null;
-    this.api.moveCard(card.id, targetList.id, afterId).subscribe(this.afterMove(card));
+    this.api
+      .moveCard(card.id, targetList.id, afterId)
+      .subscribe(this.afterMove(card));
   }
 
   /**
@@ -443,7 +600,9 @@ export class BoardDetailComponent {
     this.renaming.set(null);
     if (!title || title === list.title) return;
     this.api.renameList(list.id, title).subscribe(() => {
-      this.lists.update((lists) => lists.map((l) => (l.id === list.id ? { ...l, title } : l)));
+      this.lists.update((lists) =>
+        lists.map((l) => (l.id === list.id ? { ...l, title } : l)),
+      );
     });
   }
 
@@ -479,8 +638,9 @@ export class BoardDetailComponent {
     this.dialog().nativeElement.showModal();
     // The board payload has no descriptions; fetch this one and drop it into the editor.
     this.api.getCard(card.id).subscribe((full) => {
-      if (this.editing()?.id !== card.id) return;
-      this.editing.set({ ...this.editing()!, description: full.description });
+      const current = this.editing();
+      if (current?.id !== card.id) return;
+      this.editing.set({ ...current, description: full.description });
       const editor = this.descField();
       if (editor) editor.value = full.description ?? '';
     });
@@ -490,13 +650,19 @@ export class BoardDetailComponent {
   onCardDialogClose(): void {
     this.editing.set(null);
     if (this.route.snapshot.queryParamMap.has('card')) {
-      void this.router.navigate([], { relativeTo: this.route, queryParams: {} });
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: {},
+      });
     }
   }
 
   private patchCardLocally(id: string, patch: Partial<Card>): void {
     this.lists.update((lists) =>
-      lists.map((l) => ({ ...l, cards: l.cards.map((c) => (c.id === id ? { ...c, ...patch } : c)) })),
+      lists.map((l) => ({
+        ...l,
+        cards: l.cards.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+      })),
     );
     const open = this.editing();
     if (open?.id === id) this.editing.set({ ...open, ...patch });
@@ -506,7 +672,9 @@ export class BoardDetailComponent {
     const title = input.value.trim();
     this.editingTitle.set(false);
     if (!title || title === card.title) return;
-    this.api.updateCard(card.id, { title }).subscribe(() => this.patchCardLocally(card.id, { title }));
+    this.api
+      .updateCard(card.id, { title })
+      .subscribe(() => this.patchCardLocally(card.id, { title }));
   }
 
   moveCurrentCard(card: Card, listId: string): void {
@@ -518,31 +686,47 @@ export class BoardDetailComponent {
     const position = (last?.position ?? 0) + 1000;
     this.lists.update((lists) =>
       lists.map((l) => {
-        if (l.id === card.listId) return { ...l, cards: l.cards.filter((c) => c.id !== card.id) };
-        if (l.id === listId) return { ...l, cards: [...l.cards, { ...card, listId, position }] };
+        if (l.id === card.listId)
+          return { ...l, cards: l.cards.filter((c) => c.id !== card.id) };
+        if (l.id === listId)
+          return { ...l, cards: [...l.cards, { ...card, listId, position }] };
         return l;
       }),
     );
     this.patchCardLocally(card.id, { listId, position });
     this.api.moveCard(card.id, listId, last?.id ?? null).subscribe({
-      next: (moved) => (moved.renumbered ? this.refreshBoard() : this.patchCardLocally(card.id, { position: moved.position })),
+      next: (moved) =>
+        moved.renumbered
+          ? this.refreshBoard()
+          : this.patchCardLocally(card.id, { position: moved.position }),
       error: () => this.refreshBoard(),
     });
   }
 
   copyCard(card: Card): void {
-    this.api.createCard(card.listId, `${card.title} (copia)`).subscribe((copy) => {
-      const patch = { description: this.editing()?.id === card.id ? this.editing()!.description : null };
-      this.api.updateCard(copy.id, patch).subscribe();
-      this.lists.update((lists) =>
-        lists.map((l) => (l.id === card.listId ? { ...l, cards: [...l.cards, { ...copy, ...patch }] } : l)),
-      );
-    });
+    this.api
+      .createCard(card.listId, `${card.title} (copia)`)
+      .subscribe((copy) => {
+        const open = this.editing();
+        const patch = {
+          description: open?.id === card.id ? open.description : null,
+        };
+        this.api.updateCard(copy.id, patch).subscribe();
+        this.lists.update((lists) =>
+          lists.map((l) =>
+            l.id === card.listId
+              ? { ...l, cards: [...l.cards, { ...copy, ...patch }] }
+              : l,
+          ),
+        );
+      });
   }
 
   openArchived(dialog: HTMLDialogElement): void {
     this.boardsOpen.set(false);
-    this.boardsApi.listArchived(this.boardId).subscribe((cards) => this.archived.set(cards));
+    this.boardsApi
+      .listArchived(this.boardId)
+      .subscribe((cards) => this.archived.set(cards));
     dialog.showModal();
   }
 
@@ -563,14 +747,19 @@ export class BoardDetailComponent {
   setDue(card: Card, value: string): void {
     // The end of the chosen day, local time: a card due today is not overdue until tomorrow.
     const dueDate = value ? new Date(`${value}T23:59:59`).toISOString() : null;
-    this.api
-      .updateCard(card.id, { dueDate })
-      .subscribe(() => this.patchCardLocally(card.id, { dueDate, ...(!dueDate && { dueDone: false }) }));
+    this.api.updateCard(card.id, { dueDate }).subscribe(() =>
+      this.patchCardLocally(card.id, {
+        dueDate,
+        ...(!dueDate && { dueDone: false }),
+      }),
+    );
   }
 
   toggleDueDone(card: Card): void {
     const dueDone = !card.dueDone;
-    this.api.updateCard(card.id, { dueDone }).subscribe(() => this.patchCardLocally(card.id, { dueDone }));
+    this.api
+      .updateCard(card.id, { dueDone })
+      .subscribe(() => this.patchCardLocally(card.id, { dueDone }));
   }
 
   async shareCard(card: Card): Promise<void> {
@@ -585,7 +774,10 @@ export class BoardDetailComponent {
   archiveCard(card: Card): void {
     this.api.updateCard(card.id, { archived: true }).subscribe(() => {
       this.lists.update((lists) =>
-        lists.map((l) => ({ ...l, cards: l.cards.filter((c) => c.id !== card.id) })),
+        lists.map((l) => ({
+          ...l,
+          cards: l.cards.filter((c) => c.id !== card.id),
+        })),
       );
       this.dialog().nativeElement.close();
     });
@@ -613,15 +805,31 @@ export class BoardDetailComponent {
       label: 'Quitar',
       note: 'Perderá el acceso a este tablero y se le quitará de sus tarjetas.',
       run: () =>
-        this.boardsApi.removeMember(this.boardId, member.userId).subscribe(() => {
-          this.board.update((b) => (b ? { ...b, members: b.members.filter((m) => m.userId !== member.userId) } : b));
-          this.lists.update((lists) =>
-            lists.map((l) => ({
-              ...l,
-              cards: l.cards.map((c) => ({ ...c, assignees: c.assignees.filter((a) => a.userId !== member.userId) })),
-            })),
-          );
-        }),
+        this.boardsApi
+          .removeMember(this.boardId, member.userId)
+          .subscribe(() => {
+            this.board.update((b) =>
+              b
+                ? {
+                    ...b,
+                    members: b.members.filter(
+                      (m) => m.userId !== member.userId,
+                    ),
+                  }
+                : b,
+            );
+            this.lists.update((lists) =>
+              lists.map((l) => ({
+                ...l,
+                cards: l.cards.map((c) => ({
+                  ...c,
+                  assignees: c.assignees.filter(
+                    (a) => a.userId !== member.userId,
+                  ),
+                })),
+              })),
+            );
+          }),
     });
     this.confirmDialog().nativeElement.showModal();
   }
@@ -635,7 +843,11 @@ export class BoardDetailComponent {
       run: () =>
         this.boardsApi
           .transferOwnership(this.boardId, member.userId)
-          .subscribe(() => this.board.update((b) => (b ? { ...b, ownerId: member.userId, inviteToken: null } : b))),
+          .subscribe(() =>
+            this.board.update((b) =>
+              b ? { ...b, ownerId: member.userId, inviteToken: null } : b,
+            ),
+          ),
     });
     this.confirmDialog().nativeElement.showModal();
   }
@@ -648,7 +860,10 @@ export class BoardDetailComponent {
       verb: 'salir de',
       label: 'Salir',
       note: 'Necesitarás un nuevo enlace de invitación para volver.',
-      run: () => this.boardsApi.removeMember(this.boardId, me).subscribe(() => void this.router.navigate(['/home'])),
+      run: () =>
+        this.boardsApi
+          .removeMember(this.boardId, me)
+          .subscribe(() => void this.router.navigate(['/home'])),
     });
     this.confirmDialog().nativeElement.showModal();
   }
@@ -685,7 +900,11 @@ export class BoardDetailComponent {
   openMembers(card: Card, button: HTMLElement): void {
     if (this.dragging) return;
     // With the card modal open, only a popover inside it can receive clicks.
-    const pop = (this.dialog().nativeElement.open ? this.memberPopModal() : this.memberPop()).nativeElement;
+    const pop = (
+      this.dialog().nativeElement.open
+        ? this.memberPopModal()
+        : this.memberPop()
+    ).nativeElement;
     if (pop.matches(':popover-open')) pop.hidePopover();
     this.popoverCardId.set(card.id);
     pop.showPopover();
@@ -708,14 +927,20 @@ export class BoardDetailComponent {
   private placePopover(pop: HTMLElement, anchor: DOMRect): void {
     pop.style.left = `${Math.max(8, Math.min(anchor.left, window.innerWidth - pop.offsetWidth - 8))}px`;
     pop.style.top = `${anchor.bottom + 4}px`;
-    const overflow = pop.getBoundingClientRect().bottom - (window.innerHeight - 8);
-    if (overflow > 0) pop.style.top = `${Math.max(8, anchor.bottom + 4 - overflow)}px`;
+    const overflow =
+      pop.getBoundingClientRect().bottom - (window.innerHeight - 8);
+    if (overflow > 0)
+      pop.style.top = `${Math.max(8, anchor.bottom + 4 - overflow)}px`;
   }
 
   setLabelView(view: 'list' | 'create'): void {
     this.labelView.set(view);
     // The two screens differ in height: re-place once the new one has rendered.
-    setTimeout(() => this.labelAnchor && this.placePopover(this.labelPop().nativeElement, this.labelAnchor));
+    setTimeout(
+      () =>
+        this.labelAnchor &&
+        this.placePopover(this.labelPop().nativeElement, this.labelAnchor),
+    );
   }
 
   toggleAssignee(card: Card, member: Member): void {
@@ -737,7 +962,9 @@ export class BoardDetailComponent {
 
   toggleLabel(card: Card, label: Label): void {
     const on = this.isLabelOn(card, label);
-    const request = on ? this.api.removeLabel(card.id, label.id) : this.api.addLabel(card.id, label.id);
+    const request = on
+      ? this.api.removeLabel(card.id, label.id)
+      : this.api.addLabel(card.id, label.id);
     request.subscribe(() => {
       const labels = on
         ? card.labels.filter((l) => l.labelId !== label.id)
@@ -757,7 +984,9 @@ export class BoardDetailComponent {
     const color = this.pickedColor();
     if (!name && !color) return;
     this.boardsApi.createLabel(this.boardId, name, color).subscribe((label) => {
-      this.board.update((b) => (b ? { ...b, labels: [...b.labels, label] } : b));
+      this.board.update((b) =>
+        b ? { ...b, labels: [...b.labels, label] } : b,
+      );
       this.setLabelView('list');
       const card = this.editing();
       if (card) this.toggleLabel(card, label);
@@ -766,23 +995,36 @@ export class BoardDetailComponent {
 
   /** Background + readable text for a label; colorless labels get an outline instead. */
   chipStyle(color: string): Record<string, string> {
-    if (!color) return { background: 'transparent', color: 'var(--ink)', 'box-shadow': 'inset 0 0 0 1px var(--hairline)' };
+    if (!color)
+      return {
+        background: 'transparent',
+        color: 'var(--ink)',
+        'box-shadow': 'inset 0 0 0 1px var(--hairline)',
+      };
     const n = parseInt(color.slice(1), 16);
-    const luma = 0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255);
+    const luma =
+      0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255);
     return { background: color, color: luma > 150 ? '#172b4d' : '#ffffff' };
   }
 
   removeBoardLabel(label: Label): void {
     this.boardsApi.removeLabel(this.boardId, label.id).subscribe(() => {
-      this.board.update((b) => (b ? { ...b, labels: b.labels.filter((l) => l.id !== label.id) } : b));
+      this.board.update((b) =>
+        b ? { ...b, labels: b.labels.filter((l) => l.id !== label.id) } : b,
+      );
       this.lists.update((lists) =>
         lists.map((l) => ({
           ...l,
-          cards: l.cards.map((c) => ({ ...c, labels: c.labels.filter((cl) => cl.labelId !== label.id) })),
+          cards: l.cards.map((c) => ({
+            ...c,
+            labels: c.labels.filter((cl) => cl.labelId !== label.id),
+          })),
         })),
       );
       this.editing.update((c) =>
-        c ? { ...c, labels: c.labels.filter((cl) => cl.labelId !== label.id) } : c,
+        c
+          ? { ...c, labels: c.labels.filter((cl) => cl.labelId !== label.id) }
+          : c,
       );
     });
   }
@@ -813,13 +1055,24 @@ export class BoardDetailComponent {
     });
   }
 
-  private bumpCounts(cardId: string, comments: number, attachments: number): void {
+  private bumpCounts(
+    cardId: string,
+    comments: number,
+    attachments: number,
+  ): void {
     this.lists.update((lists) =>
       lists.map((l) => ({
         ...l,
         cards: l.cards.map((c) =>
           c.id === cardId
-            ? { ...c, _count: { ...c._count, comments: c._count.comments + comments, attachments: c._count.attachments + attachments } }
+            ? {
+                ...c,
+                _count: {
+                  ...c._count,
+                  comments: c._count.comments + comments,
+                  attachments: c._count.attachments + attachments,
+                },
+              }
             : c,
         ),
       })),
@@ -828,19 +1081,34 @@ export class BoardDetailComponent {
 
   removeComment(card: Card, comment: Comment): void {
     this.api.removeComment(card.id, comment.id).subscribe(() => {
-      this.comments.update((comments) => comments.filter((c) => c.id !== comment.id));
+      this.comments.update((comments) =>
+        comments.filter((c) => c.id !== comment.id),
+      );
       this.bumpCounts(card.id, -1, -comment.attachments.length);
     });
   }
 
   openTime(button: HTMLElement, pop: HTMLElement, entry?: TimeEntry): void {
     this.editingEntry.set(entry ?? null);
-    this.timeMemberId.set(entry?.userId ?? this.currentUserId ?? '');
-    this.timeHours.set(entry ? String(entry.hours) : '');
-    this.timeDate.set(entry ? entry.date.slice(0, 10) : new Date().toISOString().slice(0, 10));
-    this.timeNote.set(entry?.note ?? '');
+    this.fillTimeForm(entry);
     pop.showPopover();
     this.placePopover(pop, button.getBoundingClientRect());
+  }
+
+  /** An existing entry shows its own values; a new one starts on today, for the signed-in user. */
+  private fillTimeForm(entry?: TimeEntry): void {
+    if (!entry) return this.resetTimeForm();
+    this.timeMemberId.set(entry.userId);
+    this.timeHours.set(String(entry.hours));
+    this.timeDate.set(entry.date.slice(0, 10));
+    this.timeNote.set(entry.note ?? '');
+  }
+
+  private resetTimeForm(): void {
+    this.timeMemberId.set(this.currentUserId ?? '');
+    this.timeHours.set('');
+    this.timeDate.set(new Date().toISOString().slice(0, 10));
+    this.timeNote.set('');
   }
 
   /** Hours as typed, or null when it isn't something the API would accept (0 < h <= 24). */
@@ -857,10 +1125,19 @@ export class BoardDetailComponent {
     const editing = this.editingEntry();
     const request = editing
       ? this.api.updateTimeEntry(card.id, editing.id, hours, note)
-      : this.api.addTimeEntry(card.id, date, hours, note ?? undefined, this.timeMemberId() || undefined);
+      : this.api.addTimeEntry(card.id, {
+          date,
+          hours,
+          note: note ?? undefined,
+          userId: this.timeMemberId() || undefined,
+        });
     request.subscribe((entry) => {
       // Adding time to a day that already has some returns that same (merged) entry.
-      this.timeEntries.update((entries) => [entry, ...entries.filter((e) => e.id !== entry.id)].sort((a, b) => b.date.localeCompare(a.date)));
+      this.timeEntries.update((entries) =>
+        [entry, ...entries.filter((e) => e.id !== entry.id)].sort((a, b) =>
+          b.date.localeCompare(a.date),
+        ),
+      );
       pop.hidePopover();
       this.syncCardHours(card.id);
     });
@@ -868,7 +1145,9 @@ export class BoardDetailComponent {
 
   removeTimeEntry(card: Card, entry: TimeEntry): void {
     this.api.removeTimeEntry(card.id, entry.id).subscribe(() => {
-      this.timeEntries.update((entries) => entries.filter((e) => e.id !== entry.id));
+      this.timeEntries.update((entries) =>
+        entries.filter((e) => e.id !== entry.id),
+      );
       this.syncCardHours(card.id);
     });
   }
@@ -876,21 +1155,37 @@ export class BoardDetailComponent {
   /** The card face only keeps the total; recompute it from the modal's full list.
    *  Via patchCardLocally so the modal's total updates too, not just the card face. */
   private syncCardHours(cardId: string): void {
-    this.patchCardLocally(cardId, { hoursTotal: this.timeEntries().reduce((sum, e) => sum + e.hours, 0) });
+    this.patchCardLocally(cardId, {
+      hoursTotal: this.timeEntries().reduce((sum, e) => sum + e.hours, 0),
+    });
   }
 
   formatEntryDate(date: string): string {
-    return new Date(date).toLocaleDateString('es', { month: 'short', day: 'numeric', year: 'numeric' });
+    return new Date(date).toLocaleDateString('es', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
   }
 
   removeAttachment(card: Card, attachment: Attachment): void {
     this.api.removeAttachment(card.id, attachment.id).subscribe(() => {
-      this.attachments.update((atts) => atts.filter((a) => a.id !== attachment.id));
+      this.attachments.update((atts) =>
+        atts.filter((a) => a.id !== attachment.id),
+      );
       this.lists.update((lists) =>
         lists.map((l) => ({
           ...l,
           cards: l.cards.map((c) =>
-            c.id === card.id ? { ...c, _count: { ...c._count, attachments: c._count.attachments - 1 } } : c,
+            c.id === card.id
+              ? {
+                  ...c,
+                  _count: {
+                    ...c._count,
+                    attachments: c._count.attachments - 1,
+                  },
+                }
+              : c,
           ),
         })),
       );
@@ -922,9 +1217,14 @@ export class BoardDetailComponent {
   // Hidden via CSS, not removed from the array, so cdkDrag/cdkDropList indices stay valid while a filter is active.
   cardMatchesFilter(card: Card): boolean {
     const labelIds = this.filterLabelIds();
-    if (labelIds.size > 0 && !card.labels.some((l) => labelIds.has(l.labelId))) return false;
+    if (labelIds.size > 0 && !card.labels.some((l) => labelIds.has(l.labelId)))
+      return false;
     const memberIds = this.filterMemberIds();
-    if (memberIds.size > 0 && !card.assignees.some((a) => memberIds.has(a.userId))) return false;
+    if (
+      memberIds.size > 0 &&
+      !card.assignees.some((a) => memberIds.has(a.userId))
+    )
+      return false;
     return true;
   }
 
@@ -941,7 +1241,9 @@ export class BoardDetailComponent {
   toggleChecklistItem(card: Card, item: ChecklistItem): void {
     const done = !item.done;
     this.api.updateChecklistItem(card.id, item.id, { done }).subscribe(() => {
-      this.checklist.update((items) => items.map((i) => (i.id === item.id ? { ...i, done } : i)));
+      this.checklist.update((items) =>
+        items.map((i) => (i.id === item.id ? { ...i, done } : i)),
+      );
       this.syncCardChecklist(card.id);
     });
   }
@@ -965,16 +1267,25 @@ export class BoardDetailComponent {
   }
 
   private findCard(id: string): Card | undefined {
-    return this.lists().flatMap((l) => l.cards).find((c) => c.id === id);
+    return this.lists()
+      .flatMap((l) => l.cards)
+      .find((c) => c.id === id);
   }
 
   // A completed due date is never overdue, however far in the past it is.
   isOverdue(card: Card): boolean {
-    return !card.dueDone && card.dueDate !== null && new Date(card.dueDate).getTime() < Date.now();
+    return (
+      !card.dueDone &&
+      card.dueDate !== null &&
+      new Date(card.dueDate).getTime() < Date.now()
+    );
   }
 
   formatDueDate(dueDate: string): string {
-    return new Date(dueDate).toLocaleDateString('es', { month: 'short', day: 'numeric' });
+    return new Date(dueDate).toLocaleDateString('es', {
+      month: 'short',
+      day: 'numeric',
+    });
   }
 
   openShare(): void {
@@ -1005,6 +1316,7 @@ export class BoardDetailComponent {
 
 function toggled<T>(set: ReadonlySet<T>, value: T): Set<T> {
   const next = new Set(set);
-  next.has(value) ? next.delete(value) : next.add(value);
+  if (next.has(value)) next.delete(value);
+  else next.add(value);
   return next;
 }

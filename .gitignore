@@ -63,3 +63,6 @@ skills-lock.json
 # Production data (docker-compose backup service, TLS certificates for Caddy)
 backups/
 certs/
+
+.stryker-tmp
+reports

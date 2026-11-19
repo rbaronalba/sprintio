@@ -3,7 +3,9 @@
   class="bell-trigger"
   (click)="toggle()"
   [attr.aria-label]="
-    store.unread() > 0 ? 'Actividad, ' + store.unread() + ' sin leer' : 'Actividad'
+    store.unread() > 0
+      ? 'Actividad, ' + store.unread() + ' sin leer'
+      : 'Actividad'
   "
 >
   Actividad
@@ -12,11 +14,19 @@
   }
 </button>
 
-<div #panel popover class="bell-panel" role="region" aria-label="Actividad reciente">
+<div
+  #panel
+  popover
+  class="bell-panel"
+  role="region"
+  aria-label="Actividad reciente"
+>
   <div class="bell-head">
     <p class="label-caps">Actividad</p>
     @if (store.unread() > 0) {
-      <button type="button" class="link-btn" (click)="store.markAllRead()">Marcar todo como leído</button>
+      <button type="button" class="link-btn" (click)="store.markAllRead()">
+        Marcar todo como leído
+      </button>
     }
   </div>
 

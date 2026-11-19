@@ -25,18 +25,29 @@ const inline = (s: string) =>
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
     .replace(/~~(.+?)~~/g, '<s>$1</s>');
 
+/** `ul`/`ol` when the line is a list item, '' otherwise. */
+function listTagOf(marker: string | undefined): string {
+  if (marker === undefined) return '';
+  return marker === '- ' ? 'ul' : 'ol';
+}
+
+function renderLine(line: string, item: RegExpMatchArray | null): string {
+  if (item) return `<li>${inline(item[2])}</li>`;
+  return line ? `<p>${inline(line)}</p>` : '';
+}
+
 function renderRich(text: string): string {
   const out: string[] = [];
   let open = '';
   for (const line of text.split('\n')) {
-    const m = /^(- |\d+\. )(.*)$/.exec(line);
-    const tag = m ? (m[1] === '- ' ? 'ul' : 'ol') : '';
+    const item = line.match(/^(- |\d+\. )(.*)$/);
+    const tag = listTagOf(item?.[1]);
     if (tag !== open) {
       if (open) out.push(`</${open}>`);
       if (tag) out.push(`<${tag}>`);
       open = tag;
     }
-    out.push(m ? `<li>${inline(m[2])}</li>` : line ? `<p>${inline(line)}</p>` : '');
+    out.push(renderLine(line, item));
   }
   if (open) out.push(`</${open}>`);
   return out.join('');
@@ -50,41 +61,57 @@ export class RichPipe implements PipeTransform {
 }
 
 // The editor is WYSIWYG (contenteditable); this turns its DOM back into the stored Markdown.
+const mark = (m: string, s: string) => (s.trim() ? m + s + m : s);
+
+type Walk = (n: Node) => string;
+
+/** How each tag is written back as Markdown; `kids` is its already-converted content. */
+const MARKDOWN_OF: Record<
+  string,
+  (kids: string, el: HTMLElement, walk: Walk) => string
+> = {
+  B: (kids) => mark('**', kids),
+  STRONG: (kids) => mark('**', kids),
+  I: (kids) => mark('*', kids),
+  EM: (kids) => mark('*', kids),
+  S: (kids) => mark('~~', kids),
+  STRIKE: (kids) => mark('~~', kids),
+  DEL: (kids) => mark('~~', kids),
+  CODE: (kids) => mark('`', kids),
+  BR: () => '\n',
+  DIV: (kids) => '\n' + kids,
+  P: (kids) => '\n' + kids,
+  UL: (_kids, el, walk) => markdownList(el, walk, () => '- '),
+  OL: (_kids, el, walk) => {
+    let i = 0;
+    return markdownList(el, walk, () => `${++i}. `);
+  },
+};
+
+function markdownList(
+  el: HTMLElement,
+  walk: Walk,
+  bullet: () => string,
+): string {
+  return (
+    '\n' +
+    Array.from(el.children)
+      .map((li) => bullet() + walk(li))
+      .join('\n') +
+    '\n'
+  );
+}
+
 function toMarkdown(root: Node): string {
-  const mark = (m: string, s: string) => (s.trim() ? m + s + m : s);
-  const walk = (n: Node): string => {
+  const walk: Walk = (n) => {
     if (n.nodeType === Node.TEXT_NODE) return n.textContent ?? '';
     const el = n as HTMLElement;
-    const kids = () => Array.from(el.childNodes).map(walk).join('');
-    switch (el.tagName) {
-      case 'B':
-      case 'STRONG':
-        return mark('**', kids());
-      case 'I':
-      case 'EM':
-        return mark('*', kids());
-      case 'S':
-      case 'STRIKE':
-      case 'DEL':
-        return mark('~~', kids());
-      case 'CODE':
-        return mark('`', kids());
-      case 'BR':
-        return '\n';
-      case 'DIV':
-      case 'P':
-        return '\n' + kids();
-      case 'UL':
-      case 'OL': {
-        let i = 0;
-        const bullet = () => (el.tagName === 'UL' ? '- ' : `${++i}. `);
-        return '\n' + Array.from(el.children).map((li) => bullet() + walk(li)).join('\n') + '\n';
-      }
-      default:
-        return kids();
-    }
+    const kids = Array.from(el.childNodes).map(walk).join('');
+    return (MARKDOWN_OF[el.tagName] ?? ((k: string) => k))(kids, el, walk);
   };
-  return walk(root).replace(/\n{3,}/g, '\n\n').trim();
+  return walk(root)
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 /** Click-to-edit rich text, like the card title: shows the rendered text (or a hint) until clicked.
@@ -97,19 +124,73 @@ function toMarkdown(root: Node): string {
     @if (editing()) {
       <div class="rich">
         <div class="rich-bar" (mousedown)="$event.preventDefault()">
-          <button type="button" title="Negrita" aria-label="Negrita" (click)="cmd('bold')"><b>B</b></button>
-          <button type="button" title="Cursiva" aria-label="Cursiva" (click)="cmd('italic')"><i>I</i></button>
-          <button type="button" title="Tachado" aria-label="Tachado" (click)="cmd('strikeThrough')"><s>S</s></button>
-          <button type="button" title="Código" aria-label="Código" (click)="code()">&lt;&gt;</button>
+          <button
+            type="button"
+            title="Negrita"
+            aria-label="Negrita"
+            (click)="cmd('bold')"
+          >
+            <b>B</b>
+          </button>
+          <button
+            type="button"
+            title="Cursiva"
+            aria-label="Cursiva"
+            (click)="cmd('italic')"
+          >
+            <i>I</i>
+          </button>
+          <button
+            type="button"
+            title="Tachado"
+            aria-label="Tachado"
+            (click)="cmd('strikeThrough')"
+          >
+            <s>S</s>
+          </button>
+          <button
+            type="button"
+            title="Código"
+            aria-label="Código"
+            (click)="code()"
+          >
+            &lt;&gt;
+          </button>
           <span class="rich-sep"></span>
-          <button type="button" title="Lista con viñetas" aria-label="Lista con viñetas" (click)="cmd('insertUnorderedList')">&#8226;</button>
-          <button type="button" title="Lista numerada" aria-label="Lista numerada" (click)="cmd('insertOrderedList')">1.</button>
+          <button
+            type="button"
+            title="Lista con viñetas"
+            aria-label="Lista con viñetas"
+            (click)="cmd('insertUnorderedList')"
+          >
+            &#8226;
+          </button>
+          <button
+            type="button"
+            title="Lista numerada"
+            aria-label="Lista numerada"
+            (click)="cmd('insertOrderedList')"
+          >
+            1.
+          </button>
           <span class="rich-end"><ng-content /></span>
         </div>
-        <div #ed class="rich-ed rich-out" contenteditable="true" [style.min-height.px]="rows() * 21" (blur)="stop()"></div>
+        <div
+          #ed
+          class="rich-ed rich-out"
+          contenteditable="true"
+          [style.min-height.px]="rows() * 21"
+          (blur)="stop()"
+        ></div>
       </div>
     } @else {
-      <div class="rich-view" role="button" tabindex="0" (click)="start()" (keydown.enter)="start()">
+      <div
+        class="rich-view"
+        role="button"
+        tabindex="0"
+        (click)="start()"
+        (keydown.enter)="start()"
+      >
         @if (text()) {
           <div class="rich-out" [innerHTML]="text() | rich"></div>
         } @else {
@@ -119,17 +200,64 @@ function toMarkdown(root: Node): string {
     }
   `,
   styles: `
-    .rich { border: 1px solid var(--hairline); border-radius: var(--radius-md); background: var(--input-bg); }
-    .rich:focus-within { border-color: var(--ink); }
-    .rich-bar { display: flex; align-items: center; gap: 2px; padding: 2px 4px; border-bottom: 1px solid var(--hairline); }
-    .rich-bar button { min-width: 24px; height: 24px; padding: 0 4px; border: none; border-radius: var(--radius-sm); background: none; color: var(--body); font: inherit; font-size: 12px; cursor: pointer; }
-    .rich-bar button:hover { background: var(--canvas-elevated); color: var(--ink); }
-    .rich-sep { width: 1px; height: 14px; margin: 0 2px; background: var(--hairline); }
-    .rich-end { margin-inline-start: auto; display: flex; }
-    .rich-ed { padding: 6px 8px; outline: none; overflow-wrap: anywhere; }
-    .rich-view { padding: 6px 8px; border-radius: var(--radius-md); cursor: pointer; overflow-wrap: anywhere; }
-    .rich-view:hover { background: var(--canvas-elevated); }
-    .rich-empty { color: var(--muted); }
+    .rich {
+      border: 1px solid var(--hairline);
+      border-radius: var(--radius-md);
+      background: var(--input-bg);
+    }
+    .rich:focus-within {
+      border-color: var(--ink);
+    }
+    .rich-bar {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      padding: 2px 4px;
+      border-bottom: 1px solid var(--hairline);
+    }
+    .rich-bar button {
+      min-width: 24px;
+      height: 24px;
+      padding: 0 4px;
+      border: none;
+      border-radius: var(--radius-sm);
+      background: none;
+      color: var(--body);
+      font: inherit;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .rich-bar button:hover {
+      background: var(--canvas-elevated);
+      color: var(--ink);
+    }
+    .rich-sep {
+      width: 1px;
+      height: 14px;
+      margin: 0 2px;
+      background: var(--hairline);
+    }
+    .rich-end {
+      margin-inline-start: auto;
+      display: flex;
+    }
+    .rich-ed {
+      padding: 6px 8px;
+      outline: none;
+      overflow-wrap: anywhere;
+    }
+    .rich-view {
+      padding: 6px 8px;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      overflow-wrap: anywhere;
+    }
+    .rich-view:hover {
+      background: var(--canvas-elevated);
+    }
+    .rich-empty {
+      color: var(--muted);
+    }
   `,
 })
 export class RichEditorComponent implements OnInit {
@@ -177,6 +305,11 @@ export class RichEditorComponent implements OnInit {
   }
   code(): void {
     const sel = getSelection()?.toString() ?? '';
-    if (sel) document.execCommand('insertHTML', false, `<code>${escapeHtml(sel)}</code>`);
+    if (sel)
+      document.execCommand(
+        'insertHTML',
+        false,
+        `<code>${escapeHtml(sel)}</code>`,
+      );
   }
 }

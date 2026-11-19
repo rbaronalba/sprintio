@@ -52,7 +52,9 @@ export class RealtimeService {
 
   constructor() {
     // One connection per session, opened on login and torn down on logout.
-    effect(() => (this.auth.isAuthenticated() ? this.connect() : this.disconnect()));
+    effect(() =>
+      this.auth.isAuthenticated() ? this.connect() : this.disconnect(),
+    );
     inject(DestroyRef).onDestroy(() => this.disconnect());
   }
 
@@ -65,7 +67,9 @@ export class RealtimeService {
     this.http.post<{ ticket: string }>('/events/ticket', {}).subscribe({
       next: ({ ticket }) => {
         if (generation !== this.generation) return;
-        const source = new EventSource(`/events/stream?ticket=${encodeURIComponent(ticket)}`);
+        const source = new EventSource(
+          `/events/stream?ticket=${encodeURIComponent(ticket)}`,
+        );
         this.source = source;
 
         source.onopen = () => {
@@ -73,8 +77,10 @@ export class RealtimeService {
           this.connected.set(true);
         };
         source.onmessage = (event) => {
-          const message = JSON.parse(event.data) as StreamMessage | { type: 'ping' };
-          if (message.type !== 'ping') this.messages.next(message as StreamMessage);
+          const message = JSON.parse(event.data) as
+            StreamMessage | { type: 'ping' };
+          if (message.type !== 'ping')
+            this.messages.next(message as StreamMessage);
         };
         // The ticket is single-use and expires in 60s, so the browser's own retry would
         // just 401 forever. Take over: tear down and reconnect with a fresh ticket.

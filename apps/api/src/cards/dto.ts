@@ -19,64 +19,80 @@ export interface UpsertCardInput {
   listId?: string;
 }
 
+function parseTitle(title: unknown): string {
+  if (typeof title !== 'string' || title.trim().length === 0) {
+    throw new BadRequestException('Title is required');
+  }
+  if (title.length > 200) {
+    throw new BadRequestException('Title must be at most 200 characters');
+  }
+  return title.trim();
+}
+
+function parseDescription(description: unknown): string | null {
+  if (description === null) return null;
+  if (typeof description !== 'string') {
+    throw new BadRequestException('Description must be a string');
+  }
+  if (description.length > 5000) {
+    throw new BadRequestException(
+      'Description must be at most 5000 characters',
+    );
+  }
+  return description.trim() || null;
+}
+
+function parseBoolean(value: unknown, field: string): boolean {
+  if (typeof value !== 'boolean')
+    throw new BadRequestException(`${field} must be a boolean`);
+  return value;
+}
+
+function parseAfterId(afterId: unknown): string | null {
+  if (afterId === null) return null;
+  if (typeof afterId !== 'string' || afterId.length === 0) {
+    throw new BadRequestException('afterId must be an id or null');
+  }
+  return afterId;
+}
+
+function parseListId(listId: unknown): string {
+  if (typeof listId !== 'string' || listId.length === 0) {
+    throw new BadRequestException('Invalid listId');
+  }
+  return listId;
+}
+
+function parseDueDate(dueDate: unknown): Date | null {
+  return dueDate === null ? null : parseDateString(dueDate, 'dueDate');
+}
+
+const CARD_FIELD_PARSERS: {
+  [K in keyof UpsertCardInput]-?: (value: unknown) => UpsertCardInput[K];
+} = {
+  title: parseTitle,
+  description: parseDescription,
+  dueDate: parseDueDate,
+  dueDone: (value) => parseBoolean(value, 'dueDone'),
+  archived: (value) => parseBoolean(value, 'archived'),
+  afterId: parseAfterId,
+  listId: parseListId,
+};
+
+/** Each field is optional (PATCH semantics): only the ones present are validated and returned. */
 export function parseUpsertCard(body: unknown): UpsertCardInput {
-  const { title, description, dueDate, dueDone, archived, afterId, listId } = (body ?? {}) as Record<
-    string,
-    unknown
-  >;
+  const raw = (body ?? {}) as Record<string, unknown>;
   const result: UpsertCardInput = {};
 
-  if (title !== undefined) {
-    if (typeof title !== 'string' || title.trim().length === 0) {
-      throw new BadRequestException('Title is required');
-    }
-    if (title.length > 200) {
-      throw new BadRequestException('Title must be at most 200 characters');
-    }
-    result.title = title.trim();
+  for (const field of Object.keys(
+    CARD_FIELD_PARSERS,
+  ) as (keyof UpsertCardInput)[]) {
+    if (raw[field] !== undefined)
+      Object.assign(result, { [field]: CARD_FIELD_PARSERS[field](raw[field]) });
   }
-
-  if (description !== undefined) {
-    if (description !== null && typeof description !== 'string') {
-      throw new BadRequestException('Description must be a string');
-    }
-    if (description !== null && description.length > 5000) {
-      throw new BadRequestException('Description must be at most 5000 characters');
-    }
-    result.description = description?.trim() || null;
-  }
-
-  if (dueDate !== undefined) {
-    result.dueDate = dueDate === null ? null : parseDateString(dueDate, 'dueDate');
-  }
-
-  if (dueDone !== undefined) {
-    if (typeof dueDone !== 'boolean') throw new BadRequestException('dueDone must be a boolean');
-    result.dueDone = dueDone;
-  }
-
-  if (archived !== undefined) {
-    if (typeof archived !== 'boolean') throw new BadRequestException('archived must be a boolean');
-    result.archived = archived;
-  }
-
-  // Applied last so it wins over an explicit dueDone in the same body: a completion
-  // flag on a card with no due date is meaningless.
+  // A completion flag on a card with no due date is meaningless, so it wins over an
+  // explicit dueDone in the same body.
   if (result.dueDate === null) result.dueDone = false;
-
-  if (afterId !== undefined) {
-    if (afterId !== null && (typeof afterId !== 'string' || afterId.length === 0)) {
-      throw new BadRequestException('afterId must be an id or null');
-    }
-    result.afterId = afterId;
-  }
-
-  if (listId !== undefined) {
-    if (typeof listId !== 'string' || listId.length === 0) {
-      throw new BadRequestException('Invalid listId');
-    }
-    result.listId = listId;
-  }
 
   return result;
 }
@@ -87,19 +103,28 @@ export function parseUpsertCard(body: unknown): UpsertCardInput {
 const MENTION_PATTERN = /@([\w.+-]+@[\w-]+\.[\w.-]+)/g;
 
 export function extractMentions(body: string): string[] {
-  return [...new Set(Array.from(body.matchAll(MENTION_PATTERN), (m) => m[1].toLowerCase()))];
+  return [
+    ...new Set(
+      Array.from(body.matchAll(MENTION_PATTERN), (m) => m[1].toLowerCase()),
+    ),
+  ];
 }
 
 /** `withFile`: an image-only comment is fine, so the text may be empty. */
 export function parseCommentBody(body: unknown, withFile = false): string {
-  const { body: text = withFile ? '' : undefined } = (body ?? {}) as Record<string, unknown>;
-  if (typeof text !== 'string' || (!withFile && text.trim().length === 0)) {
+  const { body: text } = (body ?? {}) as Record<string, unknown>;
+  const value = text === undefined && withFile ? '' : text;
+  if (typeof value !== 'string' || isBlankWithoutFile(value, withFile)) {
     throw new BadRequestException('Comment body is required');
   }
-  if (text.length > 2000) {
+  if (value.length > 2000) {
     throw new BadRequestException('Comment must be at most 2000 characters');
   }
-  return text.trim();
+  return value.trim();
+}
+
+function isBlankWithoutFile(text: string, withFile: boolean): boolean {
+  return !withFile && text.trim().length === 0;
 }
 
 export interface UpsertTimeEntryInput {
@@ -110,25 +135,45 @@ export interface UpsertTimeEntryInput {
   userId?: string;
 }
 
-export function parseTimeEntry(body: unknown): UpsertTimeEntryInput {
-  const { date, hours, note, userId } = (body ?? {}) as Record<string, unknown>;
-
-  if (typeof hours !== 'number' || !Number.isFinite(hours) || hours <= 0 || hours > 24) {
+function parseHours(hours: unknown): number {
+  if (
+    typeof hours !== 'number' ||
+    !Number.isFinite(hours) ||
+    hours <= 0 ||
+    hours > 24
+  ) {
     throw new BadRequestException('Hours must be a number between 0 and 24');
   }
-  if (note !== undefined && (typeof note !== 'string' || note.length > 200)) {
-    throw new BadRequestException('Note must be a string of at most 200 characters');
-  }
+  return hours;
+}
 
-  if (userId !== undefined && (typeof userId !== 'string' || userId.length === 0)) {
+function parseNote(note: unknown): string | undefined {
+  if (note === undefined) return undefined;
+  if (typeof note !== 'string' || note.length > 200) {
+    throw new BadRequestException(
+      'Note must be a string of at most 200 characters',
+    );
+  }
+  return note.trim() || undefined;
+}
+
+function parseUserId(userId: unknown): string | undefined {
+  if (userId === undefined) return undefined;
+  if (typeof userId !== 'string' || userId.length === 0)
     throw new BadRequestException('Invalid userId');
-  }
+  return userId;
+}
 
+export function parseTimeEntry(body: unknown): UpsertTimeEntryInput {
+  const { date, hours, note, userId } = (body ?? {}) as Record<string, unknown>;
+  const validHours = parseHours(hours);
+  const validNote = parseNote(note);
+  const validUserId = parseUserId(userId);
   return {
     date: parseDateString(date, 'date'),
-    hours,
-    note: (note as string | undefined)?.trim() || undefined,
-    userId: userId as string | undefined,
+    hours: validHours,
+    note: validNote,
+    userId: validUserId,
   };
 }
 
@@ -139,13 +184,10 @@ export interface UpdateTimeEntryInput {
 
 export function parseTimeEntryUpdate(body: unknown): UpdateTimeEntryInput {
   const { hours, note } = (body ?? {}) as Record<string, unknown>;
-  if (typeof hours !== 'number' || !Number.isFinite(hours) || hours <= 0 || hours > 24) {
-    throw new BadRequestException('Hours must be a number between 0 and 24');
-  }
-  if (note !== undefined && note !== null && (typeof note !== 'string' || note.length > 200)) {
-    throw new BadRequestException('Note must be a string of at most 200 characters');
-  }
-  return { hours, note: (note as string | null | undefined)?.trim() || null };
+  return {
+    hours: parseHours(hours),
+    note: note === null ? null : (parseNote(note) ?? null),
+  };
 }
 
 export function parseChecklistText(body: unknown): string {
@@ -170,7 +212,8 @@ export function parseChecklistUpdate(body: unknown): UpdateChecklistItemInput {
 
   if (text !== undefined) result.text = parseChecklistText({ text });
   if (done !== undefined) {
-    if (typeof done !== 'boolean') throw new BadRequestException('done must be a boolean');
+    if (typeof done !== 'boolean')
+      throw new BadRequestException('done must be a boolean');
     result.done = done;
   }
 

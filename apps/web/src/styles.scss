@@ -158,9 +158,20 @@ select:focus {
 
 /* Rendered/edited rich text (see boards/rich-text.ts); global because it styles innerHTML content. */
 .rich-out {
-  p { margin: 0; }
-  ul, ol { margin: 2px 0; padding-inline-start: 20px; }
-  code { padding: 0 4px; border-radius: var(--radius-sm); background: var(--canvas-elevated); font-size: 12px; }
+  p {
+    margin: 0;
+  }
+  ul,
+  ol {
+    margin: 2px 0;
+    padding-inline-start: 20px;
+  }
+  code {
+    padding: 0 4px;
+    border-radius: var(--radius-sm);
+    background: var(--canvas-elevated);
+    font-size: 12px;
+  }
 }
 
 /* A button that reads as a text link ("Mark all read", "Show older comments"). */

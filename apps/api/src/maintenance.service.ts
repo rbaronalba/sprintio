@@ -1,6 +1,11 @@
 import { readdir, stat, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
-import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnApplicationBootstrap,
+  OnApplicationShutdown,
+} from '@nestjs/common';
 import { PrismaService } from './prisma/prisma.service.js';
 import { UPLOAD_DIR } from './cards/uploads.js';
 
@@ -19,7 +24,9 @@ const UPLOAD_GRACE_MS = 60 * 60 * 1000;
  * instances running it is only redundant; move it to a single scheduled job if that ever costs.
  */
 @Injectable()
-export class MaintenanceService implements OnApplicationBootstrap, OnApplicationShutdown {
+export class MaintenanceService
+  implements OnApplicationBootstrap, OnApplicationShutdown
+{
   private readonly logger = new Logger(MaintenanceService.name);
   private timer?: NodeJS.Timeout;
 
@@ -36,10 +43,16 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
 
   async run(now = Date.now()): Promise<void> {
     try {
-      const sessions = await this.prisma.session.deleteMany({ where: { expiresAt: { lt: new Date(now) } } });
-      const events = await this.prisma.event.deleteMany({ where: { createdAt: { lt: new Date(now - EVENT_RETENTION_MS) } } });
+      const sessions = await this.prisma.session.deleteMany({
+        where: { expiresAt: { lt: new Date(now) } },
+      });
+      const events = await this.prisma.event.deleteMany({
+        where: { createdAt: { lt: new Date(now - EVENT_RETENTION_MS) } },
+      });
       const files = await this.sweepUploads(now);
-      this.logger.log(`Removed ${sessions.count} sessions, ${events.count} events, ${files} orphaned files`);
+      this.logger.log(
+        `Removed ${sessions.count} sessions, ${events.count} events, ${files} orphaned files`,
+      );
     } catch (error) {
       this.logger.error('Maintenance run failed', error);
     }
@@ -49,12 +62,20 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
   async sweepUploads(now: number): Promise<number> {
     const [attachments, boards, lists] = await Promise.all([
       this.prisma.attachment.findMany({ select: { path: true } }),
-      this.prisma.board.findMany({ where: { background: { startsWith: '/uploads/' } }, select: { background: true } }),
-      this.prisma.list.findMany({ where: { background: { startsWith: '/uploads/' } }, select: { background: true } }),
+      this.prisma.board.findMany({
+        where: { background: { startsWith: '/uploads/' } },
+        select: { background: true },
+      }),
+      this.prisma.list.findMany({
+        where: { background: { startsWith: '/uploads/' } },
+        select: { background: true },
+      }),
     ]);
     const referenced = new Set([
       ...attachments.map((a) => a.path),
-      ...[...boards, ...lists].map((x) => x.background.slice('/uploads/'.length)),
+      ...[...boards, ...lists].map((x) =>
+        x.background.slice('/uploads/'.length),
+      ),
     ]);
 
     let removed = 0;

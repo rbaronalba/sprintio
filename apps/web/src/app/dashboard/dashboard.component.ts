@@ -1,10 +1,29 @@
-import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
+import { AutofocusDirective } from '../shared/autofocus.directive';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  computed,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
-import { ActivatedRoute, Router, RouterLink, RouterLinkActive } from '@angular/router';
+import {
+  ActivatedRoute,
+  Router,
+  RouterLink,
+  RouterLinkActive,
+} from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { AuthService } from '../auth/auth.service';
 import { AppHeaderComponent } from '../header/app-header.component';
-import { Board, BoardsService, Member, Workspace } from '../services/boards.service';
+import {
+  Board,
+  BoardsService,
+  Member,
+  Workspace,
+} from '../services/boards.service';
 import { avatarStyle, initials } from '../shared/avatar';
 import { backgroundStyle } from '../shared/background';
 
@@ -16,7 +35,14 @@ const RECENT_COUNT = 3;
  */
 @Component({
   selector: 'app-dashboard',
-  imports: [AppHeaderComponent, NgTemplateOutlet, ReactiveFormsModule, RouterLink, RouterLinkActive],
+  imports: [
+    AppHeaderComponent,
+    AutofocusDirective,
+    NgTemplateOutlet,
+    ReactiveFormsModule,
+    RouterLink,
+    RouterLinkActive,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss',
@@ -28,7 +54,9 @@ export class DashboardComponent {
   private readonly router = inject(Router);
   private readonly header = viewChild.required(AppHeaderComponent);
 
-  readonly view = signal<'home' | 'boards'>(this.route.snapshot.data['view'] ?? 'home');
+  readonly view = signal<'home' | 'boards'>(
+    this.route.snapshot.data['view'] ?? 'home',
+  );
   /** Set on /dashboard/w/:id: the boards view then shows just that workspace. */
   readonly workspaceId = signal(this.route.snapshot.paramMap.get('id'));
 
@@ -38,12 +66,20 @@ export class DashboardComponent {
   /** The workspace whose "Create new board" tile is showing its form. */
   readonly creatingIn = signal<string | null>(null);
   /** What the confirm dialog is about to delete: its name, the warning, and the action. */
-  readonly pendingDelete = signal<{ title: string; warning: string; run: () => void; phrase: boolean } | null>(null);
+  readonly pendingDelete = signal<{
+    title: string;
+    warning: string;
+    run: () => void;
+    phrase: boolean;
+  } | null>(null);
   /** The workspace whose name is showing as an input. */
   readonly renamingWs = signal<string | null>(null);
-  private readonly confirmDialog = viewChild.required<ElementRef<HTMLDialogElement>>('confirmDialog');
-  private readonly workspaceDialog = viewChild.required<ElementRef<HTMLDialogElement>>('workspaceDialog');
-  private readonly membersDialog = viewChild.required<ElementRef<HTMLDialogElement>>('membersDialog');
+  private readonly confirmDialog =
+    viewChild.required<ElementRef<HTMLDialogElement>>('confirmDialog');
+  private readonly workspaceDialog =
+    viewChild.required<ElementRef<HTMLDialogElement>>('workspaceDialog');
+  private readonly membersDialog =
+    viewChild.required<ElementRef<HTMLDialogElement>>('membersDialog');
 
   /** The workspace whose Members dialog is open, and its member list. */
   readonly membersOf = signal<Workspace | null>(null);
@@ -62,7 +98,9 @@ export class DashboardComponent {
   readonly recent = computed(() =>
     this.boards()
       .filter((b) => b.lastViewedAt)
-      .sort((a, b) => b.lastViewedAt!.localeCompare(a.lastViewedAt!))
+      .sort((a, b) =>
+        (b.lastViewedAt ?? '').localeCompare(a.lastViewedAt ?? ''),
+      )
       .slice(0, RECENT_COUNT),
   );
 
@@ -71,7 +109,10 @@ export class DashboardComponent {
     const only = this.workspaceId();
     return this.workspaces()
       .filter((w) => !only || w.id === only)
-      .map((w) => ({ workspace: w, boards: this.boards().filter((b) => b.workspaceId === w.id) }));
+      .map((w) => ({
+        workspace: w,
+        boards: this.boards().filter((b) => b.workspaceId === w.id),
+      }));
   });
 
   readonly form = inject(FormBuilder).nonNullable.group({
@@ -111,7 +152,10 @@ export class DashboardComponent {
     const { title } = this.form.getRawValue();
     this.boardsApi.create(title, workspaceId).subscribe({
       next: (board) => {
-        this.boards.update((boards) => [{ ...board, starred: false, lastViewedAt: null }, ...boards]);
+        this.boards.update((boards) => [
+          { ...board, starred: false, lastViewedAt: null },
+          ...boards,
+        ]);
         this.form.reset();
         this.creatingIn.set(null);
         this.pending.set(false);
@@ -137,26 +181,41 @@ export class DashboardComponent {
   /** Optimistic, rolled back if the API refuses. */
   toggleStar(board: Board): void {
     const set = (starred: boolean) =>
-      this.boards.update((boards) => boards.map((b) => (b.id === board.id ? { ...b, starred } : b)));
+      this.boards.update((boards) =>
+        boards.map((b) => (b.id === board.id ? { ...b, starred } : b)),
+      );
     set(!board.starred);
-    this.boardsApi.setStarred(board.id, !board.starred).subscribe({ error: () => set(board.starred) });
+    this.boardsApi
+      .setStarred(board.id, !board.starred)
+      .subscribe({ error: () => set(board.starred) });
   }
 
   askDelete(board: Board): void {
-    this.confirm(board.title, 'También se eliminarán todas sus listas y tarjetas. Esta acción no se puede deshacer.', () =>
-      this.boardsApi.remove(board.id).subscribe(() => {
-        this.boards.update((boards) => boards.filter((b) => b.id !== board.id));
-      }),
+    this.confirm(
+      board.title,
+      'También se eliminarán todas sus listas y tarjetas. Esta acción no se puede deshacer.',
+      () =>
+        this.boardsApi.remove(board.id).subscribe(() => {
+          this.boards.update((boards) =>
+            boards.filter((b) => b.id !== board.id),
+          );
+        }),
     );
   }
 
   askDeleteWorkspace(w: Workspace): void {
-    this.confirm(w.name, 'También se eliminarán todos los tableros de este espacio de trabajo, con sus listas y tarjetas. Esta acción no se puede deshacer.', () =>
-      this.boardsApi.removeWorkspace(w.id).subscribe(() => {
-        this.workspaces.update((list) => list.filter((x) => x.id !== w.id));
-        this.boards.update((boards) => boards.filter((b) => b.workspaceId !== w.id));
-        if (this.workspaceId() === w.id) void this.router.navigate(['/boards']);
-      }),
+    this.confirm(
+      w.name,
+      'También se eliminarán todos los tableros de este espacio de trabajo, con sus listas y tarjetas. Esta acción no se puede deshacer.',
+      () =>
+        this.boardsApi.removeWorkspace(w.id).subscribe(() => {
+          this.workspaces.update((list) => list.filter((x) => x.id !== w.id));
+          this.boards.update((boards) =>
+            boards.filter((b) => b.workspaceId !== w.id),
+          );
+          if (this.workspaceId() === w.id)
+            void this.router.navigate(['/boards']);
+        }),
     );
   }
 
@@ -167,7 +226,9 @@ export class DashboardComponent {
     const name = value.trim();
     if (!name || name === w.name) return;
     this.boardsApi.renameWorkspace(w.id, name).subscribe((updated) => {
-      this.workspaces.update((list) => list.map((x) => (x.id === w.id ? updated : x)));
+      this.workspaces.update((list) =>
+        list.map((x) => (x.id === w.id ? updated : x)),
+      );
     });
   }
 
@@ -181,17 +242,23 @@ export class DashboardComponent {
   createInvite(): void {
     const w = this.membersOf();
     if (!w) return;
-    this.boardsApi.createWorkspaceInvite(w.id).subscribe(({ token }) => this.setInviteToken(w.id, token));
+    this.boardsApi
+      .createWorkspaceInvite(w.id)
+      .subscribe(({ token }) => this.setInviteToken(w.id, token));
   }
 
   stopSharing(): void {
     const w = this.membersOf();
     if (!w) return;
-    this.boardsApi.revokeWorkspaceInvite(w.id).subscribe(() => this.setInviteToken(w.id, null));
+    this.boardsApi
+      .revokeWorkspaceInvite(w.id)
+      .subscribe(() => this.setInviteToken(w.id, null));
   }
 
   private setInviteToken(id: string, inviteToken: string | null): void {
-    this.workspaces.update((list) => list.map((x) => (x.id === id ? { ...x, inviteToken } : x)));
+    this.workspaces.update((list) =>
+      list.map((x) => (x.id === id ? { ...x, inviteToken } : x)),
+    );
     this.membersOf.update((w) => (w ? { ...w, inviteToken } : w));
   }
 
@@ -210,14 +277,17 @@ export class DashboardComponent {
     const leaving = m.userId === this.auth.currentUser()?.sub;
     this.membersDialog().nativeElement.close();
     this.confirm(
-      leaving ? `salir de ${w.name}` : `quitar a ${m.displayName || m.email} de ${w.name}`,
+      leaving
+        ? `salir de ${w.name}`
+        : `quitar a ${m.displayName || m.email} de ${w.name}`,
       leaving
         ? 'Perderás el acceso a sus tableros, salvo los que hayas creado tú.'
         : 'Perderá el acceso a sus tableros, salvo los que haya creado.',
       () =>
         this.boardsApi.removeWorkspaceMember(w.id, m.userId).subscribe(() => {
           if (!leaving) return;
-          if (this.workspaceId() === w.id) void this.router.navigate(['/boards']);
+          if (this.workspaceId() === w.id)
+            void this.router.navigate(['/boards']);
           this.load();
         }),
       true,
@@ -225,7 +295,12 @@ export class DashboardComponent {
   }
 
   /** `phrase`: the title is the whole action ("leave X") rather than a thing to delete. */
-  private confirm(title: string, warning: string, run: () => void, phrase = false): void {
+  private confirm(
+    title: string,
+    warning: string,
+    run: () => void,
+    phrase = false,
+  ): void {
     this.pendingDelete.set({ title, warning, run, phrase });
     this.confirmDialog().nativeElement.showModal();
   }

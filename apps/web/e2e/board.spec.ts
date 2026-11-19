@@ -1,19 +1,34 @@
 import { expect, test } from '@playwright/test';
-import { addCard, addList, createBoard, dragCardTo, listColumn, login, register, uniqueEmail } from './helpers';
+import {
+  addCard,
+  addList,
+  createBoard,
+  dragCardTo,
+  listColumn,
+  login,
+  register,
+  uniqueEmail,
+} from './helpers';
 
 test.describe('board basics', () => {
-  test('registers, creates a board, and adds a list and a card', async ({ page }) => {
+  test('registers, creates a board, and adds a list and a card', async ({
+    page,
+  }) => {
     await register(page, uniqueEmail('basics'));
     await createBoard(page, 'Monza');
     await addList(page, 'Backlog');
     await addCard(page, 'Backlog', 'Change the tyres');
 
-    await expect(listColumn(page, 'Backlog').getByText('Change the tyres')).toBeVisible();
+    await expect(
+      listColumn(page, 'Backlog').getByText('Change the tyres'),
+    ).toBeVisible();
   });
 
   // Regression: the popovers used to sit outside the modal <dialog>, which showModal()
   // makes inert — they rendered but swallowed every click.
-  test('assigns a member, creates a label, logs time and attaches a file from the card modal', async ({ page }) => {
+  test('assigns a member, creates a label, logs time and attaches a file from the card modal', async ({
+    page,
+  }) => {
     await register(page, uniqueEmail('modal-pops'));
     await createBoard(page, 'Imola');
     await addList(page, 'Todo');
@@ -27,7 +42,9 @@ test.describe('board basics', () => {
     await expect(modal.locator('.meta-chips .avatar')).toHaveText('TD');
 
     await modal.getByRole('button', { name: 'Añadir etiquetas' }).click();
-    await modal.getByRole('button', { name: 'Crear una etiqueta nueva' }).click();
+    await modal
+      .getByRole('button', { name: 'Crear una etiqueta nueva' })
+      .click();
     await modal.getByLabel('Título').fill('Aero');
     await modal.getByRole('button', { name: 'Crear', exact: true }).click();
     await expect(modal.locator('.meta-chips .label-chip')).toHaveText('Aero');
@@ -49,10 +66,15 @@ test.describe('board basics', () => {
       ),
     });
     await modal.getByRole('button', { name: 'Comentar', exact: true }).click();
-    await expect(modal.locator('.comment-img img')).toHaveAttribute('alt', 'pit.png');
+    await expect(modal.locator('.comment-img img')).toHaveAttribute(
+      'alt',
+      'pit.png',
+    );
   });
 
-  test('sets a due date, attaches a log file, and restores an archived card', async ({ page }) => {
+  test('sets a due date, attaches a log file, and restores an archived card', async ({
+    page,
+  }) => {
     await register(page, uniqueEmail('launch'));
     await createBoard(page, 'Suzuka');
     await addList(page, 'Todo');
@@ -70,19 +92,27 @@ test.describe('board basics', () => {
       buffer: Buffer.from('boom'),
     });
     await modal.getByRole('button', { name: 'Comentar', exact: true }).click();
-    await expect(modal.getByRole('link', { name: /server\.log/ })).toHaveAttribute('download', 'server.log');
+    await expect(
+      modal.getByRole('link', { name: /server\.log/ }),
+    ).toHaveAttribute('download', 'server.log');
 
     await modal.locator('summary[aria-label="Acciones de la tarjeta"]').click();
     await modal.getByRole('button', { name: 'Archivar' }).click();
-    await expect(listColumn(page, 'Todo').getByText('Check telemetry')).toHaveCount(0);
+    await expect(
+      listColumn(page, 'Todo').getByText('Check telemetry'),
+    ).toHaveCount(0);
 
     await page.locator('.board-title').click();
     await page.getByRole('button', { name: 'Tarjetas archivadas' }).click();
     await page.getByRole('button', { name: 'Restaurar' }).click();
-    await expect(listColumn(page, 'Todo').getByText('Check telemetry')).toBeVisible();
+    await expect(
+      listColumn(page, 'Todo').getByText('Check telemetry'),
+    ).toBeVisible();
   });
 
-  test('moves a card to another list and keeps it there after a reload', async ({ page }) => {
+  test('moves a card to another list and keeps it there after a reload', async ({
+    page,
+  }) => {
     await register(page, uniqueEmail('drag'));
     await createBoard(page, 'Spa');
     await addList(page, 'Todo');
@@ -90,12 +120,18 @@ test.describe('board basics', () => {
     await addCard(page, 'Todo', 'Box this lap');
 
     await dragCardTo(page, 'Box this lap', 'Done');
-    await expect(listColumn(page, 'Done').getByText('Box this lap')).toBeVisible();
+    await expect(
+      listColumn(page, 'Done').getByText('Box this lap'),
+    ).toBeVisible();
 
     // The real assertion: the move was persisted, not just reordered in the DOM.
     await page.reload();
-    await expect(listColumn(page, 'Done').getByText('Box this lap')).toBeVisible();
-    await expect(listColumn(page, 'Todo').getByText('Box this lap')).toHaveCount(0);
+    await expect(
+      listColumn(page, 'Done').getByText('Box this lap'),
+    ).toBeVisible();
+    await expect(
+      listColumn(page, 'Todo').getByText('Box this lap'),
+    ).toHaveCount(0);
   });
 
   test('signs back in and still sees the board', async ({ page }) => {

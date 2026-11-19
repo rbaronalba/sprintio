@@ -7,8 +7,12 @@ import { ThrottlerGuard } from '@nestjs/throttler';
  */
 @Injectable()
 export class EmailThrottlerGuard extends ThrottlerGuard {
-  protected override async getTracker(req: Record<string, any>): Promise<string> {
+  protected override async getTracker(
+    req: Record<string, any>,
+  ): Promise<string> {
     const email = req.body?.email;
-    return typeof email === 'string' ? `email:${email.trim().toLowerCase()}` : req.ip;
+    return typeof email === 'string'
+      ? `email:${email.trim().toLowerCase()}`
+      : req.ip;
   }
 }

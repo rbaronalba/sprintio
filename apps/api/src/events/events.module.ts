@@ -1,5 +1,8 @@
 import { Global, Module } from '@nestjs/common';
-import { EventsController, NotificationsController } from './events.controller.js';
+import {
+  EventsController,
+  NotificationsController,
+} from './events.controller.js';
 import { EventsService } from './events.service.js';
 import { NotificationsService } from './notifications.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';

@@ -1,6 +1,15 @@
-import { ChangeDetectionStrategy, Component, ElementRef, inject, viewChild } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  inject,
+  viewChild,
+} from '@angular/core';
 import { Router } from '@angular/router';
-import { NotificationItem, NotificationsService } from './notifications.service';
+import {
+  NotificationItem,
+  NotificationsService,
+} from './notifications.service';
 import { actorName, describeEvent, relativeTime } from './activity';
 
 @Component({
