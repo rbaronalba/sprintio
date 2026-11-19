@@ -433,8 +433,9 @@
       ¿Seguro que quieres {{ pendingDelete()?.title }}?
       {{ pendingDelete()?.warning }}
     } @else {
-      ¿Seguro que quieres eliminar <strong>{{ pendingDelete()?.title }}</strong
-      >? {{ pendingDelete()?.warning }}
+      ¿Seguro que quieres eliminar
+      <strong>{{ pendingDelete()?.title }}</strong>?
+      {{ pendingDelete()?.warning }}
     }
   </p>
   <div class="dialog-actions">

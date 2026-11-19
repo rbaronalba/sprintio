@@ -1136,8 +1136,8 @@
 <dialog #confirmDialog class="card-dialog confirm-dialog">
   <p>
     ¿Seguro que quieres {{ pendingDelete()?.verb ?? 'eliminar' }}
-    <strong>{{ pendingDelete()?.name }}</strong
-    >? {{ pendingDelete()?.note ?? '' }}
+    <strong>{{ pendingDelete()?.name }}</strong>?
+    {{ pendingDelete()?.note ?? '' }}
     @if (!pendingDelete()?.verb) {
       Esta acción no se puede deshacer.
     }

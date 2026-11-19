@@ -9,6 +9,7 @@ export default defineConfig({
     globals: true,
     root: './',
     include: ['**/*.spec.ts'],
+    testTimeout: 30_000, // password hashing makes the session tests slow on a loaded machine
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],

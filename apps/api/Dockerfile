@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
-FROM node:22-alpine AS base
-RUN corepack enable
+FROM node:26-alpine AS base
+# Node 25+ no longer ships corepack; keep in sync with packageManager in package.json
+RUN npm install -g pnpm@12.3.4
 
 FROM base AS build
 WORKDIR /repo
