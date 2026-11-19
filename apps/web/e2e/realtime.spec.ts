@@ -1,21 +1,5 @@
-import { Browser, Page, expect, test } from '@playwright/test';
-import { addCard, addList, createBoard, dragCardTo, listColumn, register, uniqueEmail } from './helpers';
-
-/** Opens the board's invite link and joins as a second, freshly registered user. */
-async function inviteSecondUser(owner: Page, browser: Browser, email: string) {
-  await owner.getByRole('button', { name: 'Compartir' }).click();
-  await owner.getByRole('button', { name: 'Crear enlace de invitación' }).click();
-  const link = await owner.getByLabel('Enlace de invitación').inputValue();
-  await owner.getByRole('button', { name: 'Cerrar' }).click();
-
-  const guestContext = await browser.newContext();
-  const guest = await guestContext.newPage();
-  await register(guest, email, 'Guest Driver');
-  await guest.goto(new URL(link).pathname);
-  await guest.getByRole('button', { name: /unirse/i }).click();
-  await expect(guest).toHaveURL(/\/boards\/[^/?]+/);
-  return { guest, guestContext };
-}
+import { expect, test } from '@playwright/test';
+import { addCard, addList, createBoard, dragCardTo, inviteSecondUser, listColumn, register, uniqueEmail } from './helpers';
 
 test.describe('live collaboration', () => {
   test('a card moved by one member appears moved for the other without a reload', async ({

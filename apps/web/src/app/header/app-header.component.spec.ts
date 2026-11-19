@@ -5,6 +5,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { Router, provideRouter } from '@angular/router';
 import { AuthService } from '../auth/auth.service';
 import { AppHeaderComponent } from './app-header.component';
+import { flushSessionRequests } from '../../testing/session-requests';
 
 @Component({ template: '' })
 class BlankComponent {}
@@ -34,8 +35,7 @@ describe('AppHeaderComponent', () => {
 
   // Logging in opens the live stream and loads the bell; neither is what these tests are about.
   afterEach(() => {
-    httpMock.match('/events/ticket').forEach((req) => req.flush({ ticket: 'stream-ticket' }));
-    httpMock.match('/notifications').forEach((req) => req.flush({ unread: 0, items: [] }));
+    flushSessionRequests(httpMock);
     httpMock.verify();
   });
 

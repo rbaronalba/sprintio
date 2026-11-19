@@ -1,4 +1,4 @@
-import { Page, expect } from '@playwright/test';
+import { Browser, Page, expect } from '@playwright/test';
 
 /**
  * Every run registers its own account, so tests never depend on data a previous run
@@ -65,7 +65,8 @@ export async function addCard(page: Page, listTitle: string, cardTitle: string):
 
 /**
  * CDK drag-drop ignores a single instant mouse move, so the pointer is stepped across
- * the target to produce the intermediate move events it listens for.
+ * the target to produce the intermediate move events it listens for. Resolves once the
+ * move has been saved.
  */
 export async function dragCardTo(page: Page, cardTitle: string, targetListTitle: string) {
   const card = page.locator('.card').filter({ hasText: cardTitle }).first();
@@ -75,6 +76,8 @@ export async function dragCardTo(page: Page, cardTitle: string, targetListTitle:
   const to = await target.boundingBox();
   if (!from || !to) throw new Error('Card or target list is not visible');
 
+  // Armed before the drop and awaited after it: reloading before the PATCH lands aborts the save.
+  const saved = page.waitForResponse((r) => r.request().method() === 'PATCH' && r.url().includes('/cards/'));
   await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
   await page.mouse.down();
   for (let step = 1; step <= 8; step++) {
@@ -84,4 +87,21 @@ export async function dragCardTo(page: Page, cardTitle: string, targetListTitle:
     );
   }
   await page.mouse.up();
+  await saved;
+}
+
+/** Opens the board's invite link and joins as a second, freshly registered user. */
+export async function inviteSecondUser(owner: Page, browser: Browser, email: string) {
+  await owner.getByRole('button', { name: 'Compartir' }).click();
+  await owner.getByRole('button', { name: 'Crear enlace de invitación' }).click();
+  const link = await owner.getByLabel('Enlace de invitación').inputValue();
+  await owner.getByRole('button', { name: 'Cerrar' }).click();
+
+  const guestContext = await browser.newContext();
+  const guest = await guestContext.newPage();
+  await register(guest, email, 'Guest Driver');
+  await guest.goto(new URL(link).pathname);
+  await guest.getByRole('button', { name: /unirse/i }).click();
+  await expect(guest).toHaveURL(/\/boards\/[^/?]+/);
+  return { guest, guestContext };
 }

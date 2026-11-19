@@ -1,105 +1,76 @@
-import { describe, expect, it, vi } from 'vitest';
-import { firstValueFrom, take, toArray } from 'rxjs';
+import { describe, expect, it } from 'vitest';
 import { EventsService } from './events.service.js';
 import { extractMentions } from '../cards/dto.js';
 import { mailSubject } from './mail.js';
-
-/** Minimal prisma stub: enough for record() and the membership lookup, nothing more. */
-function stubPrisma(boardIds: string[], created: unknown[] = []) {
-  return {
-    event: {
-      create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
-        id: 'e1',
-        createdAt: new Date('2026-09-23T10:00:00Z'),
-        ...data,
-        actor: { email: 'actor@sprintio.test' },
-      })),
-    },
-    notification: {
-      createMany: vi.fn(async ({ data }: { data: unknown[] }) => {
-        created.push(...data);
-        return { count: data.length };
-      }),
-    },
-    boardMember: {
-      findMany: vi.fn(async () => boardIds.map((boardId) => ({ boardId }))),
-    },
-  };
-}
+import { stubFailingPrisma, stubPrisma, subscribe } from '../../test/support/events.stub.js';
 
 describe('EventsService', () => {
   it('never delivers events from a board the subscriber does not belong to', async () => {
     const service = new EventsService(stubPrisma(['mine']) as never);
-    const received = firstValueFrom(service.streamFor('u1').pipe(take(1), toArray()));
-    // Let the membership lookup settle before anything is published.
-    await new Promise((resolve) => setTimeout(resolve));
+    const stream = await subscribe(service, 'u1', 1);
 
     await service.record({ type: 'CARD_CREATED', boardId: 'someone-elses', actorId: 'u9' });
     await service.record({ type: 'CARD_CREATED', boardId: 'mine', actorId: 'u9' });
 
-    const messages = await received;
-    expect(messages.map((m) => m.boardId)).toEqual(['mine']);
+    expect(await stream.received).toMatchObject([{ boardId: 'mine' }]);
   });
 
   it('widens the stream when the subscriber joins a board mid-connection', async () => {
     const service = new EventsService(stubPrisma([]) as never);
-    const received = firstValueFrom(service.streamFor('u1').pipe(take(2), toArray()));
-    await new Promise((resolve) => setTimeout(resolve));
+    const stream = await subscribe(service, 'u1', 2);
 
     await service.record({ type: 'MEMBER_JOINED', boardId: 'b2', actorId: 'u1' });
     await service.record({ type: 'CARD_CREATED', boardId: 'b2', actorId: 'u9' });
 
-    const messages = await received;
-    expect(messages.map((m) => m.type)).toEqual(['MEMBER_JOINED', 'CARD_CREATED']);
+    expect(await stream.received).toMatchObject([{ type: 'MEMBER_JOINED' }, { type: 'CARD_CREATED' }]);
   });
 
   it('does not let someone else joining widen my stream', async () => {
     const service = new EventsService(stubPrisma([]) as never);
-    const received = firstValueFrom(service.streamFor('u1').pipe(take(1), toArray()));
-    await new Promise((resolve) => setTimeout(resolve));
+    const stream = await subscribe(service, 'u1', 1);
 
     await service.record({ type: 'MEMBER_JOINED', boardId: 'b2', actorId: 'someone-else' });
     await service.record({ type: 'CARD_CREATED', boardId: 'b2', actorId: 'someone-else' });
     // Only an event on a board u1 actually belongs to should ever arrive.
     await service.record({ type: 'MEMBER_JOINED', boardId: 'b3', actorId: 'u1' });
 
-    const messages = await received;
-    expect(messages[0]?.boardId).toBe('b3');
+    expect(await stream.received).toMatchObject([{ boardId: 'b3' }]);
   });
 
   it('widens the stream for the workspace members a new board lists, and only them', async () => {
     const service = new EventsService(stubPrisma([]) as never);
-    const received = firstValueFrom(service.streamFor('u1').pipe(take(2), toArray()));
-    await new Promise((resolve) => setTimeout(resolve));
+    const stream = await subscribe(service, 'u1', 2);
 
     await service.record({ type: 'BOARD_CREATED', boardId: 'other', actorId: 'u9', data: { userIds: ['u2'] } });
     await service.record({ type: 'CARD_CREATED', boardId: 'other', actorId: 'u9' });
     await service.record({ type: 'BOARD_CREATED', boardId: 'b2', actorId: 'u9', data: { userIds: ['u1', 'u2'] } });
     await service.record({ type: 'CARD_CREATED', boardId: 'b2', actorId: 'u9' });
 
-    const messages = await received;
-    expect(messages.map((m) => `${m.type}@${m.boardId}`)).toEqual(['BOARD_CREATED@b2', 'CARD_CREATED@b2']);
+    expect(await stream.received).toMatchObject([
+      { type: 'BOARD_CREATED', boardId: 'b2' },
+      { type: 'CARD_CREATED', boardId: 'b2' },
+    ]);
   });
 
   it('narrows the stream when the subscriber is removed, after telling them', async () => {
     const service = new EventsService(stubPrisma(['b1', 'b2']) as never);
-    const received = firstValueFrom(service.streamFor('u1').pipe(take(2), toArray()));
-    await new Promise((resolve) => setTimeout(resolve));
+    const stream = await subscribe(service, 'u1', 2);
 
     await service.record({ type: 'MEMBER_REMOVED', boardId: 'b1', actorId: 'owner', data: { userId: 'u1' } });
     await service.record({ type: 'CARD_CREATED', boardId: 'b1', actorId: 'owner' });
     await service.record({ type: 'CARD_CREATED', boardId: 'b2', actorId: 'owner' });
 
-    const messages = await received;
-    expect(messages.map((m) => `${m.type}@${m.boardId}`)).toEqual(['MEMBER_REMOVED@b1', 'CARD_CREATED@b2']);
+    expect(await stream.received).toMatchObject([
+      { type: 'MEMBER_REMOVED', boardId: 'b1' },
+      { type: 'CARD_CREATED', boardId: 'b2' },
+    ]);
   });
 
   it('notifies the targets but never the actor, and marks recipients per subscriber', async () => {
-    const created: unknown[] = [];
-    const service = new EventsService(stubPrisma(['b1'], created) as never);
-    const mine = firstValueFrom(service.streamFor('target').pipe(take(1), toArray()));
-    const theirs = firstValueFrom(service.streamFor('bystander').pipe(take(1), toArray()));
-    await new Promise((resolve) => setTimeout(resolve));
+    const prisma = stubPrisma(['b1']);
+    const service = new EventsService(prisma as never);
+    const target = await subscribe(service, 'target', 1);
+    const bystander = await subscribe(service, 'bystander', 1);
 
     await service.record({
       type: 'CARD_ASSIGNED',
@@ -108,17 +79,13 @@ describe('EventsService', () => {
       notify: ['target', 'actor', 'target'],
     });
 
-    expect(created).toEqual([{ userId: 'target', eventId: 'e1' }]);
-    expect((await mine)[0].notified).toBe(true);
-    expect((await theirs)[0].notified).toBe(false);
+    expect(prisma.created).toEqual([{ userId: 'target', eventId: 'e1' }]);
+    expect(await target.received).toMatchObject([{ notified: true }]);
+    expect(await bystander.received).toMatchObject([{ notified: false }]);
   });
 
   it('keeps a failed write from breaking the action that triggered it', async () => {
-    const prisma = stubPrisma(['b1']);
-    prisma.event.create = vi.fn(async () => {
-      throw new Error('database is down');
-    });
-    const service = new EventsService(prisma as never);
+    const service = new EventsService(stubFailingPrisma(['b1']) as never);
     // The card move already happened; logging it must not turn that into a 500.
     await expect(
       service.record({ type: 'CARD_MOVED', boardId: 'b1', actorId: 'u1' }),

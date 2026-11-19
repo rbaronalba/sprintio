@@ -4,82 +4,7 @@ import { afterEach, vi } from 'vitest';
 import { scryptSync } from 'node:crypto';
 import { AuthService } from './auth.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import type { Role, Session, User } from '../generated/prisma/client.js';
-
-function createPrismaMock() {
-  const users = new Map<string, User>();
-  const sessions = new Map<string, Session>();
-  let seq = 0;
-  const matches = (s: Session, where: Partial<Record<keyof Session, unknown>>) =>
-    Object.entries(where).every(([k, v]) =>
-      v && typeof v === 'object' && 'lt' in v
-        ? (s[k as keyof Session] as Date) < (v as { lt: Date }).lt
-        : v && typeof v === 'object' && 'in' in v
-          ? (v as { in: unknown[] }).in.includes(s[k as keyof Session])
-          : v && typeof v === 'object' && 'not' in v
-            ? s[k as keyof Session] !== (v as { not: unknown }).not
-            : s[k as keyof Session] === v,
-    );
-
-  return {
-    users,
-    sessions,
-    user: {
-      findUnique: async ({ where }: { where: { id?: string; email?: string; microsoftId?: string } }) => {
-        if (where.id) return users.get(where.id) ?? null;
-        if (where.microsoftId) return [...users.values()].find((u) => u.microsoftId === where.microsoftId) ?? null;
-        return [...users.values()].find((u) => u.email === where.email) ?? null;
-      },
-      create: async ({ data }: { data: { email: string; passwordHash?: string; microsoftId?: string } }) => {
-        const user: User = {
-          id: `user_${++seq}`,
-          email: data.email,
-          displayName: null,
-          passwordHash: data.passwordHash ?? null,
-          microsoftId: data.microsoftId ?? null,
-          role: 'DEVELOPER' as Role,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        };
-        users.set(user.id, user);
-        return user;
-      },
-      update: async ({ where, data }: { where: { id: string }; data: Partial<User> }) => {
-        const user = users.get(where.id)!;
-        Object.assign(user, data);
-        return user;
-      },
-    },
-    session: {
-      findUnique: async ({ where }: { where: { id: string } }) => {
-        const s = sessions.get(where.id);
-        return s ? { ...s } : null;
-      },
-      create: async ({ data }: { data: Pick<Session, 'userId' | 'tokenHash' | 'expiresAt'> }) => {
-        const s: Session = { id: `s_${++seq}`, prevTokenHash: null, rotatedAt: null, createdAt: new Date(Date.now() + seq), ...data };
-        sessions.set(s.id, s);
-        return s;
-      },
-      update: async ({ where, data }: { where: { id: string }; data: Partial<Session> }) =>
-        Object.assign(sessions.get(where.id)!, data),
-      updateMany: async ({ where, data }: { where: Partial<Session>; data: Partial<Session> }) => {
-        const hit = [...sessions.values()].filter((s) => matches(s, where));
-        hit.forEach((s) => Object.assign(s, data));
-        return { count: hit.length };
-      },
-      findMany: async ({ where, skip = 0 }: { where: { userId: string }; skip?: number }) =>
-        [...sessions.values()]
-          .filter((s) => s.userId === where.userId)
-          .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-          .slice(skip),
-      deleteMany: async ({ where }: { where: Partial<Record<keyof Session, unknown>> }) => {
-        const hit = [...sessions.values()].filter((s) => matches(s, where));
-        hit.forEach((s) => sessions.delete(s.id));
-        return { count: hit.length };
-      },
-    },
-  };
-}
+import { createPrismaMock, loginTimes } from '../../test/support/prisma.fake.js';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -104,8 +29,7 @@ describe('AuthService', () => {
     expect(result.refreshToken).toBeTruthy();
     expect(result.user).toMatchObject({ email: 'dev@sprintio.test', role: 'DEVELOPER' });
 
-    const stored = [...prisma.users.values()][0];
-    expect(stored.passwordHash).toMatch(/^scrypt\$131072\$8\$1\$/);
+    expect(prisma.users.get(result.user.sub)!.passwordHash).toMatch(/^scrypt\$131072\$8\$1\$/);
   });
 
   it('rejects registering the same email twice', async () => {
@@ -163,9 +87,9 @@ describe('AuthService', () => {
   });
 
   it('keeps at most 10 sessions per user, dropping the oldest', async () => {
-    await service.register('many@sprintio.test', 'password123', 'Many Devices');
-    for (let i = 0; i < 11; i++) await service.login('many@sprintio.test', 'password123');
-    const left = await prisma.session.findMany({ where: { userId: [...prisma.users.values()][0].id } });
+    const { user } = await service.register('many@sprintio.test', 'password123', 'Many Devices');
+    await loginTimes(service, 'many@sprintio.test', 'password123', 11);
+    const left = await prisma.session.findMany({ where: { userId: user.sub } });
     expect(left).toHaveLength(10);
   });
 

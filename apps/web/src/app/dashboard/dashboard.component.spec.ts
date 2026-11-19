@@ -5,6 +5,8 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { provideRouter } from '@angular/router';
 import { AuthService } from '../auth/auth.service';
 import { DashboardComponent } from './dashboard.component';
+import { idsOf } from '../../testing/ids';
+import { flushSessionRequests } from '../../testing/session-requests';
 
 @Component({ template: '' })
 class BlankComponent {}
@@ -33,15 +35,8 @@ describe('DashboardComponent', () => {
     fixture = TestBed.createComponent(DashboardComponent);
   });
 
-  // Logging in opens the live stream and loads the bell; neither is what these tests
-  // are about, so they are answered once here rather than in every case.
-  const flushSessionRequests = () => {
-    httpMock.match('/events/ticket').forEach((req) => req.flush({ ticket: 'stream-ticket' }));
-    httpMock.match('/notifications').forEach((req) => req.flush({ unread: 0, items: [] }));
-  };
-
   afterEach(() => {
-    flushSessionRequests();
+    flushSessionRequests(httpMock);
     httpMock.verify();
   });
 
@@ -65,13 +60,17 @@ describe('DashboardComponent', () => {
     ]);
     fixture.detectChanges();
 
-    const groups: HTMLElement[] = Array.from(fixture.nativeElement.querySelectorAll('section.group'));
-    expect(groups.map((g) => g.getAttribute('aria-label'))).toEqual(['Software', 'Admin']);
-    expect(groups[0].querySelector('button[aria-label="Eliminar tablero"]')).not.toBeNull();
-    expect(groups[1].querySelector('button[aria-label="Eliminar tablero"]')).toBeNull();
+    const groups: NodeListOf<HTMLElement> = fixture.nativeElement.querySelectorAll('section.group');
+    const software = groups[0];
+    const admin = groups[1];
+    expect(groups.length).toBe(2);
+    expect(software.getAttribute('aria-label')).toBe('Software');
+    expect(admin.getAttribute('aria-label')).toBe('Admin');
+    expect(software.querySelector('button[aria-label="Eliminar tablero"]')).not.toBeNull();
+    expect(admin.querySelector('button[aria-label="Eliminar tablero"]')).toBeNull();
     // Only workspace members add boards; w2 is only visible through a directly shared board.
-    expect(groups[0].querySelector('.board-tile--new')).not.toBeNull();
-    expect(groups[1].querySelector('.board-tile--new')).toBeNull();
+    expect(software.querySelector('.board-tile--new')).not.toBeNull();
+    expect(admin.querySelector('.board-tile--new')).toBeNull();
   });
 
   it('lists the three most recently viewed boards, newest first', () => {
@@ -83,7 +82,7 @@ describe('DashboardComponent', () => {
       board('d', '1', 'w1', '2026-09-02T00:00:00Z'),
     ]);
     httpMock.expectOne('/workspaces').flush([{ id: 'w1', name: 'Software', ownerId: '1', isMember: true, inviteToken: null }]);
-    expect(fixture.componentInstance.recent().map((b) => b.id)).toEqual(['b', 'c', 'd']);
+    expect(idsOf(fixture.componentInstance.recent())).toEqual(['b', 'c', 'd']);
   });
 
   it('shows starred boards on Home', () => {

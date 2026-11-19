@@ -89,11 +89,8 @@ test.describe('board basics', () => {
     await addList(page, 'Done');
     await addCard(page, 'Todo', 'Box this lap');
 
-    // Reloading before the PATCH lands aborts it, which reads as "the move wasn't saved".
-    const saved = page.waitForResponse((r) => r.request().method() === 'PATCH' && r.url().includes('/cards/'));
     await dragCardTo(page, 'Box this lap', 'Done');
     await expect(listColumn(page, 'Done').getByText('Box this lap')).toBeVisible();
-    await saved;
 
     // The real assertion: the move was persisted, not just reordered in the DOM.
     await page.reload();
