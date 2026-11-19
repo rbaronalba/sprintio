@@ -41,8 +41,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter api exec prisma generate
       - run: pnpm --filter api run lint
+      - run: pnpm --filter api run format:check
       - run: pnpm --filter api run build
-      - run: pnpm --filter api run test
+      - run: pnpm --filter api run test:cov
 
   web:
     runs-on: ubuntu-latest
@@ -54,8 +55,10 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter web run lint
+      - run: pnpm --filter web run format:check
       - run: pnpm --filter web run build
-      - run: pnpm --filter web exec ng test --watch=false --browsers=ChromeHeadless
+      - run: pnpm --filter web run test:cov
 
   # Browser tests against the real stack: the only job that proves the SSE stream,
   # nginx's proxy_buffering and the drag-and-drop persistence actually work together.
@@ -93,3 +96,18 @@ jobs:
         with:
           name: playwright-report
           path: apps/web/test-results
+
+  # Slow, so not on every PR: checks that the tests of the pure logic actually fail when it breaks.
+  mutation:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter api exec prisma generate
+      - run: pnpm --filter api run test:mutation
